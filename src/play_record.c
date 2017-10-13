@@ -172,8 +172,19 @@ int playRecord (
 	jack_default_audio_sample_t *inL, *outL, *inR, *outR;
 	inL = jack_port_get_buffer (looper->input_portL, nframes);
 	outL = jack_port_get_buffer (looper->output_portL, nframes);
-	inR = jack_port_get_buffer (looper->input_portR, nframes);
-	outR = jack_port_get_buffer (looper->output_portR, nframes);
+
+    // mono devices will use only the left ports
+    // if right ports are NULL, do not copy data
+    inR = NULL;
+    outR = NULL;
+    if (looper->input_portR)
+    {
+	    inR = jack_port_get_buffer (looper->input_portR, nframes);
+    }
+    if (looper->output_portR)
+    {
+	    outR = jack_port_get_buffer (looper->output_portR, nframes);
+    }
 
     // Record/Overdub/Playback
     switch(looper->state)
@@ -181,7 +192,15 @@ int playRecord (
         case SYSTEM_STATE_PASSTHROUGH:
         {
             memcpy (outL, inL, byteSize);
-            memcpy (outR, inR, byteSize);
+            if((inR == NULL) && (outR)) // mono in, simulated mono out
+            {
+                memcpy (outR, inL, byteSize);
+            }
+            else if ((inR) && (outR)) // stereo in, stereo out
+            {
+                memcpy (outR, inR, byteSize);
+            }
+            // if mono, out left channel only
             break;
         }
         case SYSTEM_STATE_OVERDUBBING:
@@ -192,10 +211,13 @@ int playRecord (
                 inL,
                 &looper->groupedTracks[sg][st]->channelLeft[trackIdx],
                 nframes);
-            overdub(
-                inR,
-                &looper->groupedTracks[sg][st]->channelRight[trackIdx],
-                nframes);
+            if (inR)
+            {
+                overdub(
+                    inR,
+                    &looper->groupedTracks[sg][st]->channelRight[trackIdx],
+                    nframes);
+            }
             // pass through to mixdown
         }
         case SYSTEM_STATE_RECORDING:
@@ -210,10 +232,13 @@ int playRecord (
                     &looper->groupedTracks[sg][st]->channelLeft[trackIdx],
                     inL,
                     byteSize);
-                memcpy (
-                    &looper->groupedTracks[sg][st]->channelRight[trackIdx],
-                    inR,
-                    byteSize);
+                if (inR)
+                {
+                    memcpy (
+                        &looper->groupedTracks[sg][st]->channelRight[trackIdx],
+                        inR,
+                        byteSize);
+                }
 
             }
             // pass through to mixdown
@@ -224,7 +249,14 @@ int playRecord (
             doMixDown(looper, inL, inR, mixdownLeft, mixdownRight, nframes);
             // output mix
             memcpy (outL, mixdownLeft, byteSize);
-            memcpy (outR, mixdownRight, byteSize);
+            if (inR && outR)
+            {
+                memcpy (outR, mixdownRight, byteSize);
+            }
+            if (!inR && outR) // simulate mono
+            {
+                memcpy (outR, mixdownLeft, byteSize);
+            }
             break;
         }
         default:

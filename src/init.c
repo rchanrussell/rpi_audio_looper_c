@@ -104,7 +104,8 @@ void jack_shutdown (void *arg)
 	if (jack_disconnect (client, ports[0], jack_port_name (looper.input_portL))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	}
-    if (jack_disconnect (client, ports[1], jack_port_name (looper.input_portR))) {
+    if ((looper.input_portR) &&
+        (jack_disconnect (client, ports[1], jack_port_name (looper.input_portR)))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	}
 
@@ -120,7 +121,8 @@ void jack_shutdown (void *arg)
 	if (jack_disconnect (client, jack_port_name (looper.output_portL), ports[0])) {
 		fprintf (stderr, "cannot connect output ports\n");
 	}
-	if (jack_disconnect (client, jack_port_name (looper.output_portR), ports[1])) {
+    if ((looper.output_portR) &&
+	    (jack_disconnect (client, jack_port_name (looper.output_portR), ports[1]))) {
 		fprintf (stderr, "cannot connect output ports\n");
 	}
 
@@ -235,9 +237,11 @@ int main (int argc, char *argv[])
 
     // Establish connection between ports
 	if (jack_connect (client, ports[0], jack_port_name (looper.input_portL))) {
+        looper.input_portL = NULL;
 		fprintf (stderr, "cannot connect input ports\n");
 	}
     if (jack_connect (client, ports[1], jack_port_name (looper.input_portR))) {
+        looper.input_portR = NULL;
 		fprintf (stderr, "cannot connect input ports\n");
 	}
 
@@ -251,9 +255,11 @@ int main (int argc, char *argv[])
 	}
 
 	if (jack_connect (client, jack_port_name (looper.output_portL), ports[0])) {
+        looper.output_portL = NULL;
 		fprintf (stderr, "cannot connect output ports\n");
 	}
 	if (jack_connect (client, jack_port_name (looper.output_portR), ports[1])) {
+        looper.output_portR = NULL;
 		fprintf (stderr, "cannot connect output ports\n");
 	}
 

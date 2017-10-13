@@ -120,7 +120,6 @@ static void startRecording(void)
          (cc.group != looper->selectedGroup) ||
         ((getNumActiveTracks() == 1) && (looper->selectedTrack == cc.track)) )
     {
-printf("reset CurIdx, mL = 0\n");
         looper->masterCurrIdx = 0;
         looper->masterLength[cc.group] = 0;
     }
