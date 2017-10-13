@@ -8,7 +8,7 @@
  *                                                            *
  * Functionality: (commands are in ASCII)                     *
  * - Record: record a track and assign track to a group       *
- *   rXXYYr: command - r, track XX, group YY,                 *
+ *   rXXgYr: command - r, track XX, group Y,                  *
  *        optional r for repeat on                            *
  * - Overdub: overdub on a track                              *
  *   oXX00: command - o, track XX, pad 00                     *
@@ -20,11 +20,11 @@
  *   p0000, p0000r: command - p, pad 0000,                    *
  *       optional r for repeat on, s for repeat off           *
  * - Track: add a track to a group                            *
- *   tXXYY: command - t, track XX, group YY                   *
+ *   tXXgY: command - t, track XX, group Y                    *
  * - Delete: remove a track from a group                      *
- *   dXXYY: command - d, track XX, group YY                   *
+ *   dXXgY: command - d, track XX, group Y                    *
  * - Group: set active group                                  *
- *   gYY00: command - g, group YY, pad 00                     *
+ *   gY000: command - g, group Y, pad 000                     *
  * - Stop: reset and return to passthrough state              *
  *   s0000: command - s, pad 0000                             *
  * - Quit: stops the looper application and Jack server       *
