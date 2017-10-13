@@ -100,9 +100,9 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
                 }
 
                 // update master track's masterLength if neccessary
-                if (looper->groupedTracks[sg][idx]->endIdx > looper->masterLength)
+                if (looper->groupedTracks[sg][idx]->endIdx > looper->masterLength[sg])
                 {
-                    looper->masterLength = looper->groupedTracks[sg][idx]->endIdx;
+                    looper->masterLength[sg] = looper->groupedTracks[sg][idx]->endIdx;
                 }
             }
             else // playback only - ensure we haven't exceeded endIdx
@@ -115,7 +115,7 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
                 {
                     looper->groupedTracks[sg][idx]->currIdx = looper->groupedTracks[sg][idx]->startIdx;
                 }
-                if (looper->masterCurrIdx > looper->masterLength)
+                if (looper->masterCurrIdx > looper->masterLength[sg])
                 {
                     looper->groupedTracks[sg][idx]->currIdx = (looper->groupedTracks[sg][idx]->repeat) ? looper->groupedTracks[sg][idx]->startIdx : 0;
                 }
@@ -124,7 +124,7 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
         idx++;
     }
     // reset master's current index here, as we needed it above to know if we're resetting all tracks index or not
-    if ((looper->state == SYSTEM_STATE_PLAYBACK) && (looper->masterCurrIdx > looper->masterLength))
+    if ((looper->state == SYSTEM_STATE_PLAYBACK) && (looper->masterCurrIdx > looper->masterLength[sg]))
     {
         looper->masterCurrIdx = 0;
     }

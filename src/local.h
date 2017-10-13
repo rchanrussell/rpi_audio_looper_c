@@ -130,17 +130,17 @@ struct MasterLooper
     jack_port_t *output_portL;
     jack_port_t *input_portR;
     jack_port_t *output_portR;
-    pthread_t controlTh;            // Thread to monitor the UART/Interfaces
-    uint32_t    masterLength;       // Longest track, some tracks may be on repeat, others silent
-    uint32_t    masterCurrIdx;      // Current index of master track
-    int         sfd;                // Serial port file description
-    uint8_t     selectedTrack;      // Track number we're recording to, 0xFF if playback only
-    uint8_t     selectedGroup;      // 0 for no groups - mute - 1+ if recording
+    pthread_t controlTh;                    // Thread to monitor the UART/Interfaces
+    uint32_t    masterLength[NUM_GROUPS];   // Longest track, some tracks may be on repeat, others silent
+    uint32_t    masterCurrIdx;              // Current index of master track
+    int         sfd;                        // Serial port file description
+    uint8_t     selectedTrack;              // Track number we're recording to, 0xFF if playback only
+    uint8_t     selectedGroup;              // 0 for no groups - mute - 1+ if recording
     uint8_t     min_serial_data_length;     // minimum UART data received before command processed
-    enum        SystemStates state; // Current state of the system
-    bool        monitoringOff;      // Allow system input to be output, turn off when tuning or not wanting any noise going through
-    bool        controlLocked;      // Prevent updates to states while Jack is processing
-    bool        exitNow;            // Enables program to exit via UART cmd
+    enum        SystemStates state;         // Current state of the system
+    bool        monitoringOff;              // Allow system input to be output, turn off when tuning or not wanting any noise going through
+    bool        controlLocked;              // Prevent updates to states while Jack is processing
+    bool        exitNow;                    // Enables program to exit via UART cmd
 };
 
 

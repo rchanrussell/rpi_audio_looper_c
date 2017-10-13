@@ -114,12 +114,15 @@ static void startRecording(void)
     looper->tracks[cc.track].repeat = cc.repeat;
 
     // If numTracks == 0 or selectedTrack is same as new track and numTracks == 1
+    // or if we are recording on a new group
     // --> reset master index and length
     if ( (getNumActiveTracks() == 0) ||
+         (cc.group != looper->selectedGroup) ||
         ((getNumActiveTracks() == 1) && (looper->selectedTrack == cc.track)) )
     {
+printf("reset CurIdx, mL = 0\n");
         looper->masterCurrIdx = 0;
-        looper->masterLength = 0;
+        looper->masterLength[cc.group] = 0;
     }
 
     // reset end, set current and start to the master's current index
@@ -179,9 +182,9 @@ static void stopRecording(void)
 
     looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx;
 
-    if (looper->masterLength < looper->masterCurrIdx)
+    if (looper->masterLength[cc.group] < looper->masterCurrIdx)
     {
-        looper->masterLength = looper->masterCurrIdx;
+        looper->masterLength[cc.group] = looper->masterCurrIdx;
         looper->masterCurrIdx = 0;
     }
     looper->state = SYSTEM_STATE_PLAYBACK;
@@ -210,9 +213,9 @@ static void stopOverdubbing(void)
     {
         looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx;
     }
-    if (looper->masterLength < looper->masterCurrIdx)
+    if (looper->masterLength[cc.group] < looper->masterCurrIdx)
     {
-        looper->masterLength = looper->masterCurrIdx;
+        looper->masterLength[cc.group] = looper->masterCurrIdx;
         looper->masterCurrIdx = 0;
     }
     looper->state = SYSTEM_STATE_PLAYBACK;
@@ -234,7 +237,10 @@ static void resetSystem(void)
     int track = 0;
     int group = 0;
 
-    looper->masterLength = 0;
+    for (group = 0; group < NUM_GROUPS; group++)
+    {
+        looper->masterLength[group] = 0;
+    }
     looper->masterCurrIdx = 0;
     looper->selectedTrack = 0;
     looper->selectedGroup = 0;
