@@ -8,8 +8,7 @@
  *                                                            *
  * Functionality: (commands are in ASCII)                     *
  * - Record: record a track and assign track to a group       *
- *   rXXgYr: command - r, track XX, group Y,                  *
- *        optional r for repeat on                            *
+ *   rXXgY: command - r, track XX, group Y,                   *
  * - Overdub: overdub on a track                              *
  *   oXX00: command - o, track XX, pad 00                     *
  * - Mute: mute a track                                       *
@@ -17,8 +16,11 @@
  * - Unmute: unmute a track                                   *
  *   uXX00: command - u, track XX, pad 00                     *
  * - Play: stop recording and play all tracks on active group *
- *   p0000, p0000r: command - p, pad 0000,                    *
+ *   p0000, pXX00r: command - p, track XX, pad 00,            *
  *       optional r for repeat on, s for repeat off           *
+ *       track is only valid when changing repeat status and  *
+ *       in playback mode already -- track is ignored if cmd  *
+ *       is used to stop recording or overdubbing             *
  * - Track: add a track to a group                            *
  *   tXXgY: command - t, track XX, group Y                    *
  * - Delete: remove a track from a group                      *
@@ -98,7 +100,7 @@ static int getNumActiveTracks(void)
  * Input: none
  * Output: none
  * Description:
- *   Start recording active track, assign to active group, enable repeat if set
+ *   Start recording active track, assign to active group
  *   and handle indices
  *
  */
@@ -109,9 +111,6 @@ static void startRecording(void)
     {
         looper->groupedTracks[cc.group][cc.track] = &looper->tracks[cc.track];
     }
-
-    // Set repeat
-    looper->tracks[cc.track].repeat = cc.repeat;
 
     // If numTracks == 0 or selectedTrack is same as new track and numTracks == 1
     // or if we are recording on a new group
@@ -124,6 +123,9 @@ static void startRecording(void)
         looper->masterLength[cc.group] = 0;
     }
 
+    // Recording so reset repeat to false
+    looper->tracks[cc.track].repeat = false;
+
     // reset end, set current and start to the master's current index
     // this prevents user from waiting for looper to restart and remain silent until
     // their desired spot -- downside: doesn't erase earlier recorded stuff
@@ -135,7 +137,6 @@ static void startRecording(void)
 
     looper->tracks[cc.track].state = TRACK_STATE_RECORDING;
     looper->state = SYSTEM_STATE_RECORDING;
-    cc.repeat = false;
     printf("Recording track %d on group %d\n", cc.track, cc.group);
 }
 
@@ -177,7 +178,10 @@ static void stopRecording(void)
     cc.group = looper->selectedGroup;
 
     // Set repeat
-    looper->tracks[cc.track].repeat = cc.repeat;
+    if (cc.repeat)
+    {
+        looper->tracks[cc.track].repeat = cc.repeat;
+    }
 
     looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx;
 
@@ -206,7 +210,10 @@ static void stopOverdubbing(void)
     cc.group = looper->selectedGroup;
 
     // Set repeat
-    looper->tracks[cc.track].repeat = cc.repeat;
+    if (cc.repeat)
+    {
+        looper->tracks[cc.track].repeat = cc.repeat;
+    }
 
     if (looper->tracks[cc.track].endIdx < looper->tracks[cc.track].currIdx)
     {
@@ -365,6 +372,34 @@ static void setActiveGroup(void)
 }
 
 /*
+ * Function: updateRepeatStatus
+ * Input: none
+ * Output: none
+ * Description:
+ *   Update repeat for a given track - intended for playback state only
+ *
+ */
+static void updateRepeatStatus(void)
+{
+    looper->selectedTrack = cc.track;
+
+    // Update repeat if changing repeat for the current track
+    if (looper->tracks[cc.track].repeat ^ cc.repeat)
+    {
+        looper->tracks[cc.track].repeat = cc.repeat;
+        if (cc.repeat)
+        {
+            printf("Repeat enabled for track %d\n", cc.track);
+        }
+        else
+        {
+            printf("Repeat disabled for track %d\n", cc.track);
+        }
+    }
+}
+
+
+/*
  * Function: eventHandlerPassthrough
  * Input: system event
  * Output: none
@@ -376,24 +411,24 @@ static void eventHandlerPassthrough(event)
 {
     switch(event)
     {
-        case SYSTEM_EVENT_PASSTHROUGH:               // System->passthrough, all tracks->off, all indexes set to 0
+        case SYSTEM_EVENT_PASSTHROUGH:               // Do nothing 
             break;
         case SYSTEM_EVENT_RECORD_TRACK:              // System->recording, track->recording - track & group # required
             startRecording();
             break;
-        case SYSTEM_EVENT_OVERDUB_TRACK:             // System->overdubbing, track->recording - track & group # required
+        case SYSTEM_EVENT_OVERDUB_TRACK:             // Do nothing
             break;
         case SYSTEM_EVENT_PLAY_TRACK:                // Reset's track's current index to start index and state to play - track # required
             break;
-        case SYSTEM_EVENT_MUTE_TRACK:                // Place particular track into Mute state - track # required
+        case SYSTEM_EVENT_MUTE_TRACK:                // Do nothing
             break;
-        case SYSTEM_EVENT_UNMUTE_TRACK:              // Changes track to Play state - track # required
+        case SYSTEM_EVENT_UNMUTE_TRACK:              // Do nothing
             break;
-        case SYSTEM_EVENT_ADD_TRACK_TO_GROUP:        // Adds a track to a group - nothing more - track # & group # required
+        case SYSTEM_EVENT_ADD_TRACK_TO_GROUP:        // Do nothing
             break;
-        case SYSTEM_EVENT_REMOVE_TRACK_FROM_GROUP:   // Removes track from a group - track # & group # required
+        case SYSTEM_EVENT_REMOVE_TRACK_FROM_GROUP:   // Do nothing
             break;
-        case SYSTEM_EVENT_SET_ACTIVE_GROUP:          // Sets the currently active group - group # required
+        case SYSTEM_EVENT_SET_ACTIVE_GROUP:          // Do nothing
             break;
         default:
             break;
@@ -421,7 +456,8 @@ static void eventHandlerPlayback(event)
         case SYSTEM_EVENT_OVERDUB_TRACK:             // System->overdubbing, track->recording - track & group # required
             startOverdubbing();
             break;
-        case SYSTEM_EVENT_PLAY_TRACK:                // Reset's track's current index to start index and state to play - track # required
+        case SYSTEM_EVENT_PLAY_TRACK:                // Update repeat status for passed track
+            updateRepeatStatus();
             break;
         case SYSTEM_EVENT_MUTE_TRACK:                // Place particular track into Mute state - track # required
             muteTrack();
@@ -458,22 +494,22 @@ static void eventHandlerRecording(event)
         case SYSTEM_EVENT_PASSTHROUGH:               // System->passthrough, all tracks->off, all indexes set to 0
             resetSystem();
             break;
-        case SYSTEM_EVENT_RECORD_TRACK:              // System->recording, track->recording - track & group # required
+        case SYSTEM_EVENT_RECORD_TRACK:              // Do nothing
             break;
-        case SYSTEM_EVENT_OVERDUB_TRACK:             // System->overdubbing, track->recording - track & group # required
+        case SYSTEM_EVENT_OVERDUB_TRACK:             // Do nothing
             break;
         case SYSTEM_EVENT_PLAY_TRACK:                // Reset's track's current index to start index and state to play - track # required
             stopRecording();
             break;
-        case SYSTEM_EVENT_MUTE_TRACK:                // Place particular track into Mute state - track # required
+        case SYSTEM_EVENT_MUTE_TRACK:                // Do nothing
             break;
-        case SYSTEM_EVENT_UNMUTE_TRACK:              // Changes track to Play state - track # required
+        case SYSTEM_EVENT_UNMUTE_TRACK:              // Do nothing
             break;
-        case SYSTEM_EVENT_ADD_TRACK_TO_GROUP:        // Adds a track to a group - nothing more - track # & group # required
+        case SYSTEM_EVENT_ADD_TRACK_TO_GROUP:        // Do nothing
             break;
-        case SYSTEM_EVENT_REMOVE_TRACK_FROM_GROUP:   // Removes track from a group - track # & group # required
+        case SYSTEM_EVENT_REMOVE_TRACK_FROM_GROUP:   // Do nothing
             break;
-        case SYSTEM_EVENT_SET_ACTIVE_GROUP:          // Sets the currently active group - group # required
+        case SYSTEM_EVENT_SET_ACTIVE_GROUP:          // Do nothing
             break;
         default:
             break;
@@ -495,22 +531,22 @@ static void eventHandlerOverdubbing(event)
         case SYSTEM_EVENT_PASSTHROUGH:               // System->passthrough, all tracks->off, all indexes set to 0
             resetSystem();
             break;
-        case SYSTEM_EVENT_RECORD_TRACK:              // System->recording, track->recording - track & group # required
+        case SYSTEM_EVENT_RECORD_TRACK:              // Do nothing
             break;
-        case SYSTEM_EVENT_OVERDUB_TRACK:             // System->overdubbing, track->recording - track & group # required
+        case SYSTEM_EVENT_OVERDUB_TRACK:             // Do nothing
             break;
         case SYSTEM_EVENT_PLAY_TRACK:                // Reset's track's current index to start index and state to play - track # required
             stopOverdubbing();
             break;
-        case SYSTEM_EVENT_MUTE_TRACK:                // Place particular track into Mute state - track # required
+        case SYSTEM_EVENT_MUTE_TRACK:                // Do nothing
             break;
-        case SYSTEM_EVENT_UNMUTE_TRACK:              // Changes track to Play state - track # required
+        case SYSTEM_EVENT_UNMUTE_TRACK:              // Do nothing
             break;
-        case SYSTEM_EVENT_ADD_TRACK_TO_GROUP:        // Adds a track to a group - nothing more - track # & group # required
+        case SYSTEM_EVENT_ADD_TRACK_TO_GROUP:        // Do nothing
             break;
-        case SYSTEM_EVENT_REMOVE_TRACK_FROM_GROUP:   // Removes track from a group - track # & group # required
+        case SYSTEM_EVENT_REMOVE_TRACK_FROM_GROUP:   // Do nothing
             break;
-        case SYSTEM_EVENT_SET_ACTIVE_GROUP:          // Sets the currently active group - group # required
+        case SYSTEM_EVENT_SET_ACTIVE_GROUP:          // Do nothing
             break;
         default:
             break;
@@ -589,10 +625,6 @@ static void processUART(char buf[])
                 cc.track = (buf[SERIAL_TRACK_UPPER_DIGIT] - 48) * 10;
                 cc.track += (buf[SERIAL_TRACK_LOWER_DIGIT] - 48);
                 cc.group = (buf[SERIAL_TRACK_GROUP_LOWER_DIGIT] - 48);
-                if (buf[SERIAL_LAST_CHAR] == SERIAL_CMD_OPTION_REPEAT_ON)
-                {
-                    cc.repeat = true;
-                }
                 startTimer(TIMER_RECORD_START_DELAY);
             }
             break;
@@ -640,11 +672,15 @@ static void processUART(char buf[])
             cc.event = SYSTEM_EVENT_PLAY_TRACK;
             if (buf[SERIAL_LAST_CHAR] == SERIAL_CMD_OPTION_REPEAT_ON)
             {
+                cc.track = (buf[SERIAL_TRACK_UPPER_DIGIT] - 48) * 10;
+                cc.track += (buf[SERIAL_TRACK_LOWER_DIGIT] - 48);
                 cc.repeat = true;
             }
             if (buf[SERIAL_LAST_CHAR] == SERIAL_CMD_OPTION_REPEAT_OFF)
             {
-                cc.repeat = true;
+                cc.track = (buf[SERIAL_TRACK_UPPER_DIGIT] - 48) * 10;
+                cc.track += (buf[SERIAL_TRACK_LOWER_DIGIT] - 48);
+                cc.repeat = false;
             }
             break;
         case SERIAL_CMD_SYSTEM_RESET_LC: // set system to passthrough
