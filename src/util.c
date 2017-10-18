@@ -40,6 +40,9 @@ typedef struct TimerConstruct tc_t;
 
 static struct timespec gettime_now;
 static tc_t timers[TIMER_COUNT];
+static const char *TIMER_STRING[] = {
+    FOREACH_TIMER(GENERATE_STRING)
+};
 
 /**************************************************************
  * Static functions
@@ -133,7 +136,7 @@ void printTimers(void)
     {
         if (timers[i].time_differenceMax > 0)
         {
-            printf("Timer %d\n", i);
+            printf("Timer %s\n", TIMER_STRING[i]);
             printf("    Max %d ns\n", timers[i].time_differenceMax);
             printf("    Last %d entries\n", MAX_TIME_SAMPLES);
             for (j = 0; j < MAX_TIME_SAMPLES; j++)

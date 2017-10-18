@@ -625,7 +625,6 @@ static void processUART(char buf[])
                 cc.track = (buf[SERIAL_TRACK_UPPER_DIGIT] - 48) * 10;
                 cc.track += (buf[SERIAL_TRACK_LOWER_DIGIT] - 48);
                 cc.group = (buf[SERIAL_TRACK_GROUP_LOWER_DIGIT] - 48);
-                startTimer(TIMER_RECORD_START_DELAY);
             }
             break;
         case SERIAL_CMD_TRACK_MUTE_LC: // set track to mute
@@ -733,7 +732,6 @@ static void *controlThread(void *arg)
     int rc;
     int byte = 0;
     char buf[] = {0,0,0,0,0,0};
-
     serialFlush(looper->sfd);
 
     while(!looper->exitNow)
@@ -746,10 +744,17 @@ static void *controlThread(void *arg)
         if ((rc > 0) && (fds[0].revents & POLLIN))
         {
             buf[byte] = serialGetchar(looper->sfd);
+            if (buf[byte] == 'r')
+                startTimer(TIMER_RECORD_START_DELAY);
+            if ((buf[byte] == 'p') && (looper->state == SYSTEM_STATE_RECORDING))
+                startTimer(TIMER_RECORD_STOP_DELAY);
+
             byte++;
             if (byte == looper->min_serial_data_length)
             {
+                startTimer(TIMER_UART_PROCESS);
                 processUART(buf);
+                stopTimer(TIMER_UART_PROCESS);
                 byte = 0;
             }
         }

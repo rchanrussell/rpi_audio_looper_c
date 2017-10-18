@@ -67,16 +67,34 @@
 #define SERIAL_CMD_ACCEPTED             'p'
 #define SERIAL_CMD_REJECTED             'f'
 
+// Timer defines
+#define TIMER_COUNT	(5)
+#define FOREACH_TIMER(TIMER) \
+    TIMER(TIMER_RECORD_START_DELAY) \
+    TIMER(TIMER_PLAY_RECORD_DELAY)  \
+    TIMER(TIMER_PROCESS_TO_PROCESS_TIME) \
+    TIMER(TIMER_RECORD_STOP_DELAY) \
+    TIMER(TIMER_UART_PROCESS) \
+
+#define GENERATE_ENUM(ENUM) ENUM,
+#define GENERATE_STRING(STRING) #STRING,
+
 /**************************************************************
  * Data types                                                 *
  *************************************************************/
-enum TimerIndex
+enum TIMER_ENUM {
+    FOREACH_TIMER(GENERATE_ENUM)
+};
+/*
 {
     TIMER_RECORD_START_DELAY,
     TIMER_PLAY_RECORD_DELAY,
     TIMER_PROCESS_TO_PROCESS_TIME,
+    TIMER_RECORD_STOP_DELAY,
+    TIMER_UART_PROCESS,
     TIMER_COUNT
 };
+*/
 
 enum TrackState
 {

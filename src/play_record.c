@@ -245,6 +245,7 @@ int playRecord (
         }
         case SYSTEM_STATE_PLAYBACK:
         {
+            stopTimer(TIMER_RECORD_STOP_DELAY);
             // mixdown
             doMixDown(looper, inL, inR, mixdownLeft, mixdownRight, nframes);
             // output mix
