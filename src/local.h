@@ -148,9 +148,15 @@ struct MasterLooper
     jack_port_t *output_portL;
     jack_port_t *input_portR;
     jack_port_t *output_portR;
+    jack_client_t *client;
     pthread_t controlTh;                    // Thread to monitor the UART/Interfaces
     uint32_t    masterLength[NUM_GROUPS];   // Longest track, some tracks may be on repeat, others silent
     uint32_t    masterCurrIdx;              // Current index of master track
+    // Frame counters for synchronization
+    jack_nframes_t ui_frames_cmd_rx;        // Frame count when command received
+    jack_nframes_t process_frames;          // Frame count when Process called
+    jack_nframes_t rec_frame_delay;         // Frames between rec and actual update
+    jack_nframes_t play_frame_delay;        // Frames between play and actual update
     int         sfd;                        // Serial port file description
     uint8_t     selectedTrack;              // Track number we're recording to, 0xFF if playback only
     uint8_t     selectedGroup;              // 0 for no groups - mute - 1+ if recording

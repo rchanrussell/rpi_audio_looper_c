@@ -93,7 +93,7 @@ void jack_shutdown (void *arg)
     shuttingDown = true;
 
 	const char **ports;
-	ports = jack_get_ports (client, NULL, NULL,
+	ports = jack_get_ports (looper.client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsOutput);
 	if (ports == NULL) {
 		fprintf(stderr, "no physical capture ports\n");
@@ -101,28 +101,28 @@ void jack_shutdown (void *arg)
 	}
 
     // Establish connection between ports
-	if (jack_disconnect (client, ports[0], jack_port_name (looper.input_portL))) {
+	if (jack_disconnect (looper.client, ports[0], jack_port_name (looper.input_portL))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	}
     if ((looper.input_portR) &&
-        (jack_disconnect (client, ports[1], jack_port_name (looper.input_portR)))) {
+        (jack_disconnect (looper.client, ports[1], jack_port_name (looper.input_portR)))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	}
 
 	free (ports);
 	
-	ports = jack_get_ports (client, NULL, NULL,
+	ports = jack_get_ports (looper.client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsInput);
 	if (ports == NULL) {
 		fprintf(stderr, "no physical playback ports\n");
 		exit (1);
 	}
 
-	if (jack_disconnect (client, jack_port_name (looper.output_portL), ports[0])) {
+	if (jack_disconnect (looper.client, jack_port_name (looper.output_portL), ports[0])) {
 		fprintf (stderr, "cannot connect output ports\n");
 	}
     if ((looper.output_portR) &&
-	    (jack_disconnect (client, jack_port_name (looper.output_portR), ports[1]))) {
+	    (jack_disconnect (looper.client, jack_port_name (looper.output_portR), ports[1]))) {
 		fprintf (stderr, "cannot connect output ports\n");
 	}
 
@@ -152,8 +152,8 @@ int main (int argc, char *argv[])
 
 	/* open a client connection to the JACK server */
 
-	client = jack_client_open (client_name, options, &status, server_name);
-	if (client == NULL) {
+	looper.client = jack_client_open (client_name, options, &status, server_name);
+	if (looper.client == NULL) {
 		fprintf (stderr, "jack_client_open() failed, "
 			 "status = 0x%2.0x\n", status);
 		if (status & JackServerFailed) {
@@ -161,11 +161,12 @@ int main (int argc, char *argv[])
 		}
 		exit (1);
 	}
+
 	if (status & JackServerStarted) {
 		fprintf (stderr, "JACK server started\n");
 	}
 	if (status & JackNameNotUnique) {
-		client_name = jack_get_client_name(client);
+		client_name = jack_get_client_name(looper.client);
 		fprintf (stderr, "unique name `%s' assigned\n", client_name);
 	}
 
@@ -173,33 +174,33 @@ int main (int argc, char *argv[])
 	   there is work to be done.
 	*/
 
-	jack_set_process_callback (client, process, 0);
+	jack_set_process_callback (looper.client, process, 0);
 
 	/* tell the JACK server to call `jack_shutdown()' if
 	   it ever shuts down, either entirely, or if it
 	   just decides to stop calling us.
 	*/
 
-	jack_on_shutdown (client, jack_shutdown, 0);
+	jack_on_shutdown (looper.client, jack_shutdown, 0);
 
 	/* display the current sample rate. 
 	 */
 
 	printf ("engine sample rate: %" PRIu32 "\n",
-		jack_get_sample_rate (client));
+		jack_get_sample_rate (looper.client));
 
 	/* create four ports -- left in and out, right in and out */
 
-	looper.input_portL = jack_port_register (client, "inputL",
+	looper.input_portL = jack_port_register (looper.client, "inputL",
 					 JACK_DEFAULT_AUDIO_TYPE,
 					 JackPortIsInput, 0);
-	looper.input_portR = jack_port_register (client, "inputR",
+	looper.input_portR = jack_port_register (looper.client, "inputR",
 					 JACK_DEFAULT_AUDIO_TYPE,
 					 JackPortIsInput, 0);
-	looper.output_portL = jack_port_register (client, "outputL",
+	looper.output_portL = jack_port_register (looper.client, "outputL",
 					  JACK_DEFAULT_AUDIO_TYPE,
 					  JackPortIsOutput, 0);
-	looper.output_portR = jack_port_register (client, "outputR",
+	looper.output_portR = jack_port_register (looper.client, "outputR",
 					  JACK_DEFAULT_AUDIO_TYPE,
 					  JackPortIsOutput, 0);
 
@@ -215,7 +216,7 @@ int main (int argc, char *argv[])
 	/* Tell the JACK server that we are ready to roll.  Our
 	 * process() callback will start running now. */
 
-	if (jack_activate (client)) {
+	if (jack_activate (looper.client)) {
 		fprintf (stderr, "cannot activate client");
 		exit (1);
 	}
@@ -228,7 +229,7 @@ int main (int argc, char *argv[])
 	 * it.
 	 */
 
-	ports = jack_get_ports (client, NULL, NULL,
+	ports = jack_get_ports (looper.client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsOutput);
 	if (ports == NULL) {
 		fprintf(stderr, "no physical capture ports\n");
@@ -236,34 +237,35 @@ int main (int argc, char *argv[])
 	}
 
     // Establish connection between ports
-	if (jack_connect (client, ports[0], jack_port_name (looper.input_portL))) {
+	if (jack_connect (looper.client, ports[0], jack_port_name (looper.input_portL))) {
         looper.input_portL = NULL;
 		fprintf (stderr, "cannot connect input ports\n");
 	}
-    if (jack_connect (client, ports[1], jack_port_name (looper.input_portR))) {
+    if (jack_connect (looper.client, ports[1], jack_port_name (looper.input_portR))) {
         looper.input_portR = NULL;
 		fprintf (stderr, "cannot connect input ports\n");
 	}
 
 	free (ports);
 	
-	ports = jack_get_ports (client, NULL, NULL,
+	ports = jack_get_ports (looper.client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsInput);
 	if (ports == NULL) {
 		fprintf(stderr, "no physical playback ports\n");
 		exit (1);
 	}
 
-	if (jack_connect (client, jack_port_name (looper.output_portL), ports[0])) {
+	if (jack_connect (looper.client, jack_port_name (looper.output_portL), ports[0])) {
         looper.output_portL = NULL;
 		fprintf (stderr, "cannot connect output ports\n");
 	}
-	if (jack_connect (client, jack_port_name (looper.output_portR), ports[1])) {
+	if (jack_connect (looper.client, jack_port_name (looper.output_portR), ports[1])) {
         looper.output_portR = NULL;
 		fprintf (stderr, "cannot connect output ports\n");
 	}
 
 	free (ports);
+
 
     // Set here for testing until passing group via commands
     looper.selectedGroup = 1;
@@ -292,6 +294,6 @@ int main (int argc, char *argv[])
     printf("Joining thread\n");
     pthread_join(looper.controlTh, NULL);
 
-	jack_client_close (client);
+	jack_client_close (looper.client);
 	exit (0);
 }

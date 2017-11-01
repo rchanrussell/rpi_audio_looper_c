@@ -163,7 +163,12 @@ int playRecord (
     // block control state changes while in here!
     looper->controlLocked = true;
 
-    uint32_t byteSize = sizeof (jack_default_audio_sample_t) * nframes;
+    uint32_t byteSize = (looper->rec_frame_delay > 0) ? (nframes - looper->rec_frame_delay) :
+                        (looper->play_frame_delay > 0) ? looper->play_frame_delay : nframes;
+ 
+    byteSize *= sizeof (jack_default_audio_sample_t);
+
+    uint32_t offset = (looper->rec_frame_delay > 0) ? (looper->rec_frame_delay) * sizeof(jack_default_audio_sample_t) : 0;
 
     uint8_t sg = looper->selectedGroup;
     uint8_t st = looper->selectedTrack;
@@ -206,17 +211,18 @@ int playRecord (
         case SYSTEM_STATE_OVERDUBBING:
         {
             trackIdx = looper->groupedTracks[sg][st]->currIdx;
+
             // Overdubbing
             overdub(
-                inL,
+                inL + offset,
                 &looper->groupedTracks[sg][st]->channelLeft[trackIdx],
-                nframes);
+                nframes - looper->rec_frame_delay);
             if (inR)
             {
                 overdub(
-                    inR,
+                    inR + offset,
                     &looper->groupedTracks[sg][st]->channelRight[trackIdx],
-                    nframes);
+                    nframes - looper->rec_frame_delay);
             }
             // pass through to mixdown
         }
@@ -224,19 +230,19 @@ int playRecord (
         {
             stopTimer(TIMER_RECORD_START_DELAY);
 
-            trackIdx = looper->groupedTracks[sg][st]->currIdx;
             // overwrite track
             if (looper->state != SYSTEM_STATE_OVERDUBBING)
             {
+                trackIdx = looper->groupedTracks[sg][st]->currIdx;
                 memcpy (
                     &looper->groupedTracks[sg][st]->channelLeft[trackIdx],
-                    inL,
+                    inL + offset,
                     byteSize);
                 if (inR)
                 {
                     memcpy (
                         &looper->groupedTracks[sg][st]->channelRight[trackIdx],
-                        inR,
+                        inR + offset,
                         byteSize);
                 }
 
@@ -246,8 +252,30 @@ int playRecord (
         case SYSTEM_STATE_PLAYBACK:
         {
             stopTimer(TIMER_RECORD_STOP_DELAY);
+            // if we just finished recording, we need to capture the last little bit
+            // of data, if playing only we'd miss it - it will likely be part of this
+            // buffer (nframes) but not all of it
+            if (looper->play_frame_delay > 0)
+            {
+                trackIdx = looper->groupedTracks[sg][st]->currIdx;
+                offset = 0; // want only first few frames
+                memcpy (
+                    &looper->groupedTracks[sg][st]->channelLeft[trackIdx],
+                    inL + offset,
+                    byteSize);
+                if (inR)
+                {
+                    memcpy (
+                        &looper->groupedTracks[sg][st]->channelRight[trackIdx],
+                        inR + offset,
+                        byteSize);
+                }
+                // for output mix, we want full 128 frames so restore byteSize
+                byteSize = nframes * sizeof (jack_default_audio_sample_t);
+            }
+
             // mixdown
-            doMixDown(looper, inL, inR, mixdownLeft, mixdownRight, nframes);
+            doMixDown(looper, inL, outL, mixdownLeft, mixdownRight, nframes);
             // output mix
             memcpy (outL, mixdownLeft, byteSize);
             if (inR && outR)
@@ -269,6 +297,9 @@ int playRecord (
     {
         updateIndices(looper, nframes);
     }
+
+    looper->rec_frame_delay = 0;
+    looper->play_frame_delay = 0;
 
     // block control state changes while in here!
     looper->controlLocked = false;

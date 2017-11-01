@@ -183,13 +183,14 @@ static void stopRecording(void)
         looper->tracks[cc.track].repeat = cc.repeat;
     }
 
-    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx;
+    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx + looper->play_frame_delay;
 
     if (looper->masterLength[cc.group] < looper->masterCurrIdx)
     {
-        looper->masterLength[cc.group] = looper->masterCurrIdx;
+        looper->masterLength[cc.group] = looper->masterCurrIdx + looper->play_frame_delay;
         looper->masterCurrIdx = 0;
     }
+
     looper->state = SYSTEM_STATE_PLAYBACK;
     looper->tracks[cc.track].state = TRACK_STATE_PLAYBACK;
     printf("Playing track %d\n", cc.track);
@@ -217,11 +218,11 @@ static void stopOverdubbing(void)
 
     if (looper->tracks[cc.track].endIdx < looper->tracks[cc.track].currIdx)
     {
-        looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx;
+        looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx + looper->play_frame_delay;
     }
     if (looper->masterLength[cc.group] < looper->masterCurrIdx)
     {
-        looper->masterLength[cc.group] = looper->masterCurrIdx;
+        looper->masterLength[cc.group] = looper->masterCurrIdx + looper->play_frame_delay;
         looper->masterCurrIdx = 0;
     }
     looper->state = SYSTEM_STATE_PLAYBACK;
@@ -595,7 +596,6 @@ static void controlStateMachine(uint8_t event)
  */
 static void processUART(char buf[])
 {
-    int byte = 0;
     bool invalidData = false;
 
     if ((looper->min_serial_data_length >= MIN_SERIAL_DATA_LENGTH) &&
@@ -733,7 +733,6 @@ static void *controlThread(void *arg)
     int byte = 0;
     char buf[] = {0,0,0,0,0,0};
     serialFlush(looper->sfd);
-
     while(!looper->exitNow)
     {
         rc = poll(fds, 1, timeout);
@@ -744,14 +743,20 @@ static void *controlThread(void *arg)
         if ((rc > 0) && (fds[0].revents & POLLIN))
         {
             buf[byte] = serialGetchar(looper->sfd);
-            if (buf[byte] == 'r')
-                startTimer(TIMER_RECORD_START_DELAY);
-            if ((buf[byte] == 'p') && (looper->state == SYSTEM_STATE_RECORDING))
-                startTimer(TIMER_RECORD_STOP_DELAY);
-
             byte++;
             if (byte == looper->min_serial_data_length)
             {
+                if ((buf[0] == 'r') || (buf[0] == 'R') || (buf[0] == 'o') || (buf[0] == 'O'))
+                {
+                    looper->rec_frame_delay = jack_frames_since_cycle_start(looper->client);
+                    startTimer(TIMER_RECORD_START_DELAY);
+                }
+                if (((buf[0] == 'p') || (buf[0] == 'P')) && (looper->state == SYSTEM_STATE_RECORDING))
+                {
+                    looper->play_frame_delay = jack_frames_since_cycle_start(looper->client);
+                    startTimer(TIMER_RECORD_STOP_DELAY);
+                }
+
                 startTimer(TIMER_UART_PROCESS);
                 processUART(buf);
                 stopTimer(TIMER_UART_PROCESS);

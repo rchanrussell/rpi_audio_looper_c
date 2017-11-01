@@ -121,16 +121,19 @@ void doMixDown(
             {
 
                 trackIdx = looper->groupedTracks[sg][idx]->currIdx + sample;
-                sumLeft += looper->groupedTracks[sg][idx]->channelLeft[trackIdx];
-                if (sumLeft > 0.9 * FLT_MAX)
+                if (trackIdx <= looper->groupedTracks[sg][idx]->endIdx)
                 {
-                    sumLeft *= 0.9;
-                }
+                    sumLeft += looper->groupedTracks[sg][idx]->channelLeft[trackIdx];
+                    if (sumLeft > 0.9 * FLT_MAX)
+                    {
+                        sumLeft *= 0.9;
+                    }
 
-                sumRight += looper->groupedTracks[sg][idx]->channelRight[trackIdx];
-                if (sumRight > 0.9 * FLT_MAX)
-                {
-                    sumRight *= 0.9;
+                    sumRight += looper->groupedTracks[sg][idx]->channelRight[trackIdx];
+                    if (sumRight > 0.9 * FLT_MAX)
+                    {
+                        sumRight *= 0.9;
+                    }
                 }
             }
             idx++;
