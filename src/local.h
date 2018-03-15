@@ -67,6 +67,10 @@
 #define SERIAL_CMD_ACCEPTED             'p'
 #define SERIAL_CMD_REJECTED             'f'
 
+// Debug
+#define TRACK_TEST_PULSE_COUNT          8
+#define TRACK_DEBUG_FRAME_COUNT         88200
+
 // Timer defines
 #define TIMER_COUNT	(5)
 #define FOREACH_TIMER(TIMER) \
@@ -122,7 +126,8 @@ enum SystemStates
     SYSTEM_STATE_PASSTHROUGH,       // No mixdown or recording
     SYSTEM_STATE_PLAYBACK,          // Tracks available for mixing and playing
     SYSTEM_STATE_RECORDING,         // Copying data to selected track
-    SYSTEM_STATE_OVERDUBBING        // Overdubbing selected track
+    SYSTEM_STATE_OVERDUBBING,       // Overdubbing selected track
+    SYSTEM_STATE_CALIBRATION        // For sychronization configuration
 };
 
 struct Track
@@ -133,6 +138,8 @@ struct Track
     uint32_t currIdx;               // Current index into samples, range is 0 to sampleIndexEnd
     uint32_t startIdx;              // Start location - assigned to master's current location
     uint32_t endIdx;                // Number of samples for this track - ie track length
+    uint32_t pulseIdxArr[TRACK_TEST_PULSE_COUNT];
+    uint8_t  pulseIdx;
     enum TrackState state;
     bool repeat;                    // If track isn't the longest track, we can repeat it:
                                     //      if we get to the end of this track but not master track
@@ -186,6 +193,8 @@ int playRecord (
 
 void controlStateCheck(void);
 bool controlInit(struct MasterLooper *mLooper);
+
+int getNumActiveTracks(void);
 
 void startTimer(uint8_t index);
 void stopTimer(uint8_t index);

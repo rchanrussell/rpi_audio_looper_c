@@ -100,7 +100,7 @@ void doMixDown(
     uint8_t sg = looper->selectedGroup;
     uint8_t idx = 0;
     uint8_t sample;
-
+    struct Track * track;
     for (sample = 0; sample < nframes; sample++)
     {
         sumLeft = 0;
@@ -113,23 +113,33 @@ void doMixDown(
         // tracks can move groups - NULL will be assigned for the former group if track moves
         while (idx < NUM_TRACKS)
         {
-            if ( (looper->groupedTracks[sg][idx] != NULL) &&
-                 (looper->groupedTracks[sg][idx]->currIdx >= looper->groupedTracks[sg][idx]->startIdx) &&
-                 (looper->groupedTracks[sg][idx]->currIdx < looper->groupedTracks[sg][idx]->endIdx) &&
-                 (looper->groupedTracks[sg][idx]->state != TRACK_STATE_OFF) &&
-                 (looper->groupedTracks[sg][idx]->state != TRACK_STATE_MUTE))
+            track = looper->groupedTracks[sg][idx];
+            if ( (track != NULL) &&
+                 (track->currIdx >= track->startIdx) &&
+                 (track->currIdx < track->endIdx) &&
+                 (track->state != TRACK_STATE_OFF) &&
+                 (track->state != TRACK_STATE_MUTE))
             {
 
-                trackIdx = looper->groupedTracks[sg][idx]->currIdx + sample;
-                if (trackIdx <= looper->groupedTracks[sg][idx]->endIdx)
+                trackIdx = track->currIdx + sample;
+                if (trackIdx <= track->endIdx)
                 {
-                    sumLeft += looper->groupedTracks[sg][idx]->channelLeft[trackIdx];
+if (track->channelLeft[trackIdx] == FLT_MAX)
+{
+    if (track->pulseIdx < 7)
+      track->pulseIdxArr[track->pulseIdx++] = trackIdx;
+}
+if ((idx != 0) && track->channelLeft[trackIdx] > (0.001 * FLT_MAX))
+{
+    printf("T%d idx %d\n", idx, trackIdx);
+}
+                    sumLeft += track->channelLeft[trackIdx];
                     if (sumLeft > 0.9 * FLT_MAX)
                     {
                         sumLeft *= 0.9;
                     }
 
-                    sumRight += looper->groupedTracks[sg][idx]->channelRight[trackIdx];
+                    sumRight += track->channelRight[trackIdx];
                     if (sumRight > 0.9 * FLT_MAX)
                     {
                         sumRight *= 0.9;

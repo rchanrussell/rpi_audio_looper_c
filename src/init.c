@@ -285,6 +285,18 @@ int main (int argc, char *argv[])
     serialClose(looper.sfd);
     printTimers();
 
+    int i = 0;
+    for (i=0; i<looper.tracks[0].pulseIdx; i++)
+    {
+        printf("Trk %d, idx %d\n",0, looper.tracks[0].pulseIdxArr[i]);
+    }
+    for (i=0; i<looper.tracks[1].pulseIdx; i++)
+    {
+        printf("Trk %d, idx %d\n",1, looper.tracks[1].pulseIdxArr[i]);
+    }
+
+
+
     int z = 0;
     for (z = 0; z < NUM_TRACKS; z++)
     {

@@ -74,28 +74,6 @@ static struct ControlContext cc;        // for storing command info until read b
  *************************************************************/
 
 /*
- * Function: getNumActiveTracks
- * Input: none
- * Output: number of active tracks, regardless of group
- * Description:
- *   Determine the number of tracks that have recorded data, endIdx is 0 if track is empty or reset
- *
- */
-static int getNumActiveTracks(void)
-{
-    int track = 0;
-    int activeTracks = 0;
-    for (track = 0; track < NUM_TRACKS; track++)
-    {
-        if (looper->tracks[track].endIdx > 0)
-        {
-            activeTracks++;
-        }
-    }
-    return activeTracks;
-}
-
-/*
  * Function: startRecording
  * Input: none
  * Output: none
@@ -106,6 +84,14 @@ static int getNumActiveTracks(void)
  */
 static void startRecording(void)
 {
+/*
+    looper->tracks[0].endIdx = TRACK_DEBUG_FRAME_COUNT;
+    looper->selectedGroup = 1;
+    looper->selectedTrack = 1;
+    looper->groupedTracks[1][0] = &looper->tracks[0];
+    looper->tracks[0].state = TRACK_STATE_PLAYBACK;
+    looper->masterLength[1] = TRACK_DEBUG_FRAME_COUNT;
+*/
     // Handle case where track is not assigned to the given group
     if (looper->groupedTracks[cc.group][cc.track] == NULL)
     {
@@ -183,11 +169,11 @@ static void stopRecording(void)
         looper->tracks[cc.track].repeat = cc.repeat;
     }
 
-    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx + looper->play_frame_delay;
+    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx - 128;// + looper->play_frame_delay;
 
     if (looper->masterLength[cc.group] < looper->masterCurrIdx)
     {
-        looper->masterLength[cc.group] = looper->masterCurrIdx + looper->play_frame_delay;
+        looper->masterLength[cc.group] = looper->masterCurrIdx - 128;// + looper->play_frame_delay;
         looper->masterCurrIdx = 0;
     }
 
@@ -826,8 +812,47 @@ bool controlInit(struct MasterLooper *mLooper)
         printf("Error: pthread_create, rc: %d\n", rc);
         return false;
     }
+/*
+    // Testing for offset managment -- sync track 1 to track 0
+    int j = 0;
+    for (j=0; j<TRACK_DEBUG_FRAME_COUNT; j++)
+      looper->tracks[0].channelLeft[j] = FLT_MAX;
+
+    looper->tracks[0].endIdx = TRACK_DEBUG_FRAME_COUNT;
+    looper->selectedGroup = 1;
+    looper->selectedTrack = 1;
+    looper->groupedTracks[1][0] = &looper->tracks[0];
+    looper->tracks[0].state = TRACK_STATE_PLAYBACK;
+    looper->masterLength[1] = TRACK_DEBUG_FRAME_COUNT;
+    looper->state = SYSTEM_STATE_PLAYBACK;
+*/
+//    looper->groupedTracks[0][1] = &looper->tracks[1];
+//    looper->tracks[1].state = TRACK_STATE_RECORDING;
+//    looper->state = SYSTEM_STATE_CALIBRATION;
 
     return true;
+}
+
+/*
+ * Function: getNumActiveTracks
+ * Input: none
+ * Output: number of active tracks, regardless of group
+ * Description:
+ *   Determine the number of tracks that have recorded data, endIdx is 0 if track is empty or reset
+ *
+ */
+int getNumActiveTracks(void)
+{
+    int track = 0;
+    int activeTracks = 0;
+    for (track = 0; track < NUM_TRACKS; track++)
+    {
+        if (looper->groupedTracks[looper->selectedGroup][track]->endIdx > 0)
+        {
+            activeTracks++;
+        }
+    }
+    return activeTracks;
 }
 
 

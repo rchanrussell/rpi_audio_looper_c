@@ -61,7 +61,7 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
     uint8_t sg = looper->selectedGroup;
     uint8_t st = looper->selectedTrack;
     uint8_t idx = 0;
-
+    struct Track * track;
     // update master current index
     looper->masterCurrIdx += nframes;
     if (looper->masterCurrIdx > SAMPLE_LIMIT)
@@ -72,37 +72,37 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
     // some tracks may belong to more than one group - but that we only update the active group!
     while (idx < NUM_TRACKS)
     {
-
-        if ( (looper->groupedTracks[sg][idx] != NULL) &&
-             (looper->groupedTracks[sg][idx]->state != TRACK_STATE_OFF)) 
+        track = looper->groupedTracks[sg][idx];
+        if ( (track != NULL) &&
+             (track->state != TRACK_STATE_OFF)) 
         {
             // for playback, we can let currIdx exceed endIdx for a track - mixdown won't mix it
             // if repeating, it will be reset below
-            looper->groupedTracks[sg][idx]->currIdx += nframes;
+            track->currIdx += nframes;
 
             // if recording/overdubbing we might be increasing endIdx
             if ((st == idx) &&
-                ((looper->state == SYSTEM_STATE_OVERDUBBING) ||
+                ((looper->state == SYSTEM_STATE_CALIBRATION /*OVERDUBBING*/) ||
                 (looper->state == SYSTEM_STATE_RECORDING)))
             {
-                if (looper->groupedTracks[sg][idx]->currIdx > SAMPLE_LIMIT)
+                if (track->currIdx > SAMPLE_LIMIT)
                 {
-                    looper->groupedTracks[sg][idx]->currIdx = SAMPLE_LIMIT;
+                    track->currIdx = SAMPLE_LIMIT;
 
                     // Protect ourselves - Stop Recording/Overdubbing!!!!
                     printf("\n\n ** BUFFER FULL - Switch to Playback\n\n");
                     looper->state = SYSTEM_STATE_PLAYBACK;
                 }
                 // update selected track's endIdx if necessary
-                if (looper->groupedTracks[sg][idx]->currIdx > looper->groupedTracks[sg][idx]->endIdx)
+                if (track->currIdx > track->endIdx)
                 {
-                    looper->groupedTracks[sg][idx]->endIdx = looper->groupedTracks[sg][idx]->currIdx;
+                    track->endIdx = track->currIdx;
                 }
 
                 // update master track's masterLength if neccessary
-                if (looper->groupedTracks[sg][idx]->endIdx > looper->masterLength[sg])
+                if (track->endIdx > looper->masterLength[sg])
                 {
-                    looper->masterLength[sg] = looper->groupedTracks[sg][idx]->endIdx;
+                    looper->masterLength[sg] = track->endIdx;
                 }
             }
             else // playback only - ensure we haven't exceeded endIdx
@@ -110,14 +110,13 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
                 // if repeat is enabled and at end for current track - reset track's currIdx
                 // if masterCurrIdx > masterLength - reset all tracks' currIdx
                 // if repeat NOT enabled but at end for current track - leave it - mixdown uses this to ignore track for mixing
-                if ( looper->groupedTracks[sg][idx]->repeat &&
-                    (looper->groupedTracks[sg][idx]->currIdx > looper->groupedTracks[sg][idx]->endIdx))
+                if (track->repeat && (track->currIdx > track->endIdx))
                 {
-                    looper->groupedTracks[sg][idx]->currIdx = looper->groupedTracks[sg][idx]->startIdx;
+                    track->currIdx = track->startIdx;
                 }
                 if (looper->masterCurrIdx > looper->masterLength[sg])
                 {
-                    looper->groupedTracks[sg][idx]->currIdx = (looper->groupedTracks[sg][idx]->repeat) ? looper->groupedTracks[sg][idx]->startIdx : 0;
+                    track->currIdx = (track->repeat) ? track->startIdx : 0;
                 }
             }
         }
@@ -128,7 +127,15 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
     {
         looper->masterCurrIdx = 0;
     }
-
+/*
+    if (looper->masterLength[sg] >= TRACK_DEBUG_FRAME_COUNT)
+    {
+//        printf("\n\nTesting done\n\n");
+//        printf("quitting\n");
+        looper->exitNow = true;
+        looper->state = SYSTEM_STATE_PLAYBACK;
+    }
+*/
 }
 
 /*
@@ -165,10 +172,13 @@ int playRecord (
 
     uint32_t byteSize = (looper->rec_frame_delay > 0) ? (nframes - looper->rec_frame_delay) :
                         (looper->play_frame_delay > 0) ? looper->play_frame_delay : nframes;
- 
+
+    byteSize = nframes; 
     byteSize *= sizeof (jack_default_audio_sample_t);
 
     uint32_t offset = (looper->rec_frame_delay > 0) ? (looper->rec_frame_delay) * sizeof(jack_default_audio_sample_t) : 0;
+
+    offset = 0;
 
     uint8_t sg = looper->selectedGroup;
     uint8_t st = looper->selectedTrack;
@@ -185,7 +195,7 @@ int playRecord (
     if (looper->input_portR)
     {
 	    inR = jack_port_get_buffer (looper->input_portR, nframes);
-    }
+    } 
     if (looper->output_portR)
     {
 	    outR = jack_port_get_buffer (looper->output_portR, nframes);
@@ -211,6 +221,13 @@ int playRecord (
         case SYSTEM_STATE_OVERDUBBING:
         {
             trackIdx = looper->groupedTracks[sg][st]->currIdx;
+            // If recording to a playing track the track is moved out
+            // indices are advanced by 128 frames, so recording must be
+            // reset by 128 frames to line up with what was played
+            if (getNumActiveTracks() > 1)
+            {
+                trackIdx -= 128;
+            }
 
             // Overdubbing
             overdub(
@@ -234,6 +251,14 @@ int playRecord (
             if (looper->state != SYSTEM_STATE_OVERDUBBING)
             {
                 trackIdx = looper->groupedTracks[sg][st]->currIdx;
+            // If recording to a playing track the track is moved out
+            // indices are advanced by 128 frames, so recording must be
+            // reset by 128 frames to line up with what was played
+            if (getNumActiveTracks() > 1)
+            {
+                trackIdx -= 128;
+            }
+
                 memcpy (
                     &looper->groupedTracks[sg][st]->channelLeft[trackIdx],
                     inL + offset,
@@ -249,12 +274,27 @@ int playRecord (
             }
             // pass through to mixdown
         }
+        case SYSTEM_STATE_CALIBRATION:
+        {
+            if ((looper->state != SYSTEM_STATE_OVERDUBBING) &&
+                (looper->state != SYSTEM_STATE_RECORDING))
+            {
+                trackIdx = looper->tracks[1].currIdx;
+printf("PRCal t0idx %d, t1idx %d\n", trackIdx + offset, trackIdx);
+                memcpy (
+                    &looper->tracks[1].channelLeft[trackIdx],
+                    inL + offset,
+                    byteSize);
+            }
+            // pass through to mixdown
+        }
         case SYSTEM_STATE_PLAYBACK:
         {
             stopTimer(TIMER_RECORD_STOP_DELAY);
             // if we just finished recording, we need to capture the last little bit
             // of data, if playing only we'd miss it - it will likely be part of this
             // buffer (nframes) but not all of it
+#if 0
             if (looper->play_frame_delay > 0)
             {
                 trackIdx = looper->groupedTracks[sg][st]->currIdx;
@@ -273,7 +313,7 @@ int playRecord (
                 // for output mix, we want full 128 frames so restore byteSize
                 byteSize = nframes * sizeof (jack_default_audio_sample_t);
             }
-
+#endif
             // mixdown
             doMixDown(looper, inL, outL, mixdownLeft, mixdownRight, nframes);
             // output mix
