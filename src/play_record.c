@@ -250,14 +250,28 @@ int playRecord (
             // overwrite track
             if (looper->state != SYSTEM_STATE_OVERDUBBING)
             {
+                // If only one track, then record starting from index 0
+                // If more than one track, then assume playing to the other track(s) so take into account
+                // the buffer delay - 2 128frame buffers out and 2 buffers in or 512 frames/samples!
+                // Tracks will have to be treated as circular buffers?
+                // Corner cases: 
+                //   single track: currIdx is 0 - first recording of data
+                //   > 1 track: check master track's currIdx, see if started over (4 buffer delay)
+                //              - subtracking 4 buffers should be circular, if < 0, sub remainder from master's endIdx
+                // ** ^^ work out on blocks first in book!!! 
                 trackIdx = looper->groupedTracks[sg][st]->currIdx;
-            // If recording to a playing track the track is moved out
-            // indices are advanced by 128 frames, so recording must be
-            // reset by 128 frames to line up with what was played
-            if (getNumActiveTracks() > 1)
-            {
-                trackIdx -= 128;
-            }
+                if (getNumActiveTracks() > 1)
+                {
+                    // Check if master reset
+                    // TODO redo this whole buffer-index thing after much white-boarding
+                    if (((int)looper->masterCurrIdx - 4*128) < 0)
+                    {
+                    }
+                    else
+                    {
+                        trackIdx -= 512;
+                    }
+                }
 
                 memcpy (
                     &looper->groupedTracks[sg][st]->channelLeft[trackIdx],
@@ -315,6 +329,7 @@ printf("PRCal t0idx %d, t1idx %d\n", trackIdx + offset, trackIdx);
             }
 #endif
             // mixdown
+            // when mixing - take into account 2 buffer delay otherwise recorded will be behind
             doMixDown(looper, inL, outL, mixdownLeft, mixdownRight, nframes);
             // output mix
             memcpy (outL, mixdownLeft, byteSize);

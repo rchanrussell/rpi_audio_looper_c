@@ -27,6 +27,7 @@
 /**************************************************************
  * Macros and defines                                         *
  *************************************************************/
+#define MAX_SAMPLE_VALUE                (UINT16_MAX) // match to audio capture device, 220 is 16bit
 #define TRACK_MAX_LENGTH_S              (60)
 #define NUM_GROUPS                      (4)
 #define NUM_TRACKS                      (16)
