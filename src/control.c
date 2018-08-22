@@ -123,7 +123,7 @@ static void startRecording(void)
 
     looper->tracks[cc.track].state = TRACK_STATE_RECORDING;
     looper->state = SYSTEM_STATE_RECORDING;
-    printf("Recording track %d on group %d\n", cc.track, cc.group);
+    printf("Recording track %d on group %d, CC %d\n", cc.track, cc.group, looper->callCounter);
 }
 
 /*
@@ -169,17 +169,17 @@ static void stopRecording(void)
         looper->tracks[cc.track].repeat = cc.repeat;
     }
 
-    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx - 128;// + looper->play_frame_delay;
+    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx;// + looper->play_frame_delay;
 
     if (looper->masterLength[cc.group] < looper->masterCurrIdx)
     {
-        looper->masterLength[cc.group] = looper->masterCurrIdx - 128;// + looper->play_frame_delay;
+        looper->masterLength[cc.group] = looper->masterCurrIdx;// + looper->play_frame_delay;
         looper->masterCurrIdx = 0;
     }
 
     looper->state = SYSTEM_STATE_PLAYBACK;
     looper->tracks[cc.track].state = TRACK_STATE_PLAYBACK;
-    printf("Playing track %d\n", cc.track);
+    printf("Playing track %d, CC %d\n", cc.track, looper->callCounter);
 }
 
 /*

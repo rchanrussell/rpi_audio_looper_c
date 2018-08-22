@@ -160,6 +160,7 @@ struct MasterLooper
     pthread_t controlTh;                    // Thread to monitor the UART/Interfaces
     uint32_t    masterLength[NUM_GROUPS];   // Longest track, some tracks may be on repeat, others silent
     uint32_t    masterCurrIdx;              // Current index of master track
+    uint32_t    callCounter;
     // Frame counters for synchronization
     jack_nframes_t ui_frames_cmd_rx;        // Frame count when command received
     jack_nframes_t process_frames;          // Frame count when Process called

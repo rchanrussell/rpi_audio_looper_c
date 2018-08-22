@@ -164,6 +164,10 @@ int playRecord (
 {
     startTimer(TIMER_PLAY_RECORD_DELAY);
 
+    // Keep track of previous state so we can capture transitions
+    // this will allow us to keep recording until the buffers are in sync
+    static enum SystemStates prevSystemState = SYSTEM_STATE_PASSTHROUGH;
+
     // check for updated state(s)
     controlStateCheck();
 
@@ -200,6 +204,7 @@ int playRecord (
     {
 	    outR = jack_port_get_buffer (looper->output_portR, nframes);
     }
+
 
     // Record/Overdub/Playback
     switch(looper->state)
@@ -246,7 +251,10 @@ int playRecord (
         case SYSTEM_STATE_RECORDING:
         {
             stopTimer(TIMER_RECORD_START_DELAY);
-
+            if (prevSystemState != looper->state)
+            {
+                printf("RecDataCopy masterIDX %d, callCounter %d\n", looper->masterCurrIdx, looper->callCounter);
+            }
             // overwrite track
             if (looper->state != SYSTEM_STATE_OVERDUBBING)
             {
@@ -304,7 +312,11 @@ printf("PRCal t0idx %d, t1idx %d\n", trackIdx + offset, trackIdx);
         }
         case SYSTEM_STATE_PLAYBACK:
         {
-            stopTimer(TIMER_RECORD_STOP_DELAY);
+           if ((looper->state == SYSTEM_STATE_PLAYBACK) && (prevSystemState != looper->state))
+           {
+               printf("Play masterIDX %d, callCounter %d\n", looper->masterCurrIdx, looper->callCounter);
+           }
+           stopTimer(TIMER_RECORD_STOP_DELAY);
             // if we just finished recording, we need to capture the last little bit
             // of data, if playing only we'd miss it - it will likely be part of this
             // buffer (nframes) but not all of it
@@ -358,6 +370,9 @@ printf("PRCal t0idx %d, t1idx %d\n", trackIdx + offset, trackIdx);
 
     // block control state changes while in here!
     looper->controlLocked = false;
+
+    prevSystemState = looper->state;
+    looper->callCounter++;
 
     stopTimer(TIMER_PLAY_RECORD_DELAY);
     return 0;      

@@ -95,15 +95,14 @@ void doMixDown(
     jack_nframes_t nframes)
 {
     uint32_t trackIdx;
-    static jack_default_audio_sample_t maxVal = 0;
-    static jack_default_audio_sample_t minVal = 0;
     jack_default_audio_sample_t sumLeft = 0;
     jack_default_audio_sample_t sumRight = 0;
     uint8_t sg = looper->selectedGroup;
     uint8_t idx = 0;
     uint8_t sample;
     struct Track * track;
-    for (sample = 0; sample < nframes; sample++)
+    static bool bNoData = true;
+   for (sample = 0; sample < nframes; sample++)
     {
         sumLeft = 0;
         sumRight = 0;
@@ -118,7 +117,7 @@ void doMixDown(
             track = looper->groupedTracks[sg][idx];
             if ( (track != NULL) &&
                  (track->currIdx >= track->startIdx) &&
-                 (track->currIdx < track->endIdx) &&
+                 //(track->currIdx < track->endIdx) &&
                  (track->state != TRACK_STATE_OFF) &&
                  (track->state != TRACK_STATE_MUTE))
             {
@@ -126,27 +125,17 @@ void doMixDown(
                 trackIdx = track->currIdx + sample;
                 if (trackIdx <= track->endIdx)
                 {
+
 if (track->channelLeft[trackIdx] == MAX_SAMPLE_VALUE)
 {
     if (track->pulseIdx < 7)
       track->pulseIdxArr[track->pulseIdx++] = trackIdx;
 }
-if ((idx != 0) && track->channelLeft[trackIdx] > (0.001 * MAX_SAMPLE_VALUE))
+if ((bNoData) && (track->channelLeft[trackIdx] != 0.0))
 {
-    printf("T%d idx %d\n", idx, trackIdx);
+    printf("T%d idx %d, CC %d\n", idx, trackIdx, looper->callCounter);
+    bNoData = false;
 }
-
-if (track->channelLeft[trackIdx] > maxVal)
-{
-    maxVal = track->channelLeft[trackIdx];
-    printf("<< max %f\n", maxVal);
-}
-if (track->channelLeft[trackIdx] < minVal)
-{
-    minVal = track->channelLeft[trackIdx];
-    printf(">> MIN %f\n", minVal);
-}
-
 
                     sumLeft += track->channelLeft[trackIdx];
                     if (sumLeft > 0.9 * MAX_SAMPLE_VALUE)
@@ -166,10 +155,6 @@ if (track->channelLeft[trackIdx] < minVal)
         if (inBufferLeft)
         {
             sumLeft += inBufferLeft[sample];
-if (inBufferLeft[sample] == maxVal)
-{
-//    printf("InBuff Trk MV Match sample %d\n", sample);
-}
             if (sumLeft > 0.9 * MAX_SAMPLE_VALUE)
             {
                 sumLeft *= 0.9;
@@ -188,11 +173,6 @@ if (inBufferLeft[sample] == maxVal)
         mixdownBufferLeft[sample] = sumLeft;
         mixdownBufferRight[sample] = sumRight;
     }
-if (looper->masterLength[sg] == 0)
-{
-    maxVal = 0;
-    minVal = 0;
-}
 }
 
 
