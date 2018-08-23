@@ -177,12 +177,12 @@ int playRecord (
     uint32_t byteSize = (looper->rec_frame_delay > 0) ? (nframes - looper->rec_frame_delay) :
                         (looper->play_frame_delay > 0) ? looper->play_frame_delay : nframes;
 
-    byteSize = nframes; 
+//    byteSize = nframes; 
     byteSize *= sizeof (jack_default_audio_sample_t);
 
     uint32_t offset = (looper->rec_frame_delay > 0) ? (looper->rec_frame_delay) * sizeof(jack_default_audio_sample_t) : 0;
 
-    offset = 0;
+//    offset = 0;
 
     uint8_t sg = looper->selectedGroup;
     uint8_t st = looper->selectedTrack;
@@ -253,7 +253,7 @@ int playRecord (
             stopTimer(TIMER_RECORD_START_DELAY);
             if (prevSystemState != looper->state)
             {
-                printf("RecDataCopy masterIDX %d, callCounter %d\n", looper->masterCurrIdx, looper->callCounter);
+                printf("RecDataCopy masterIDX %d, callCounter %d, offset %d, bytes %d\n", looper->masterCurrIdx, looper->callCounter, offset, byteSize);
             }
             // overwrite track
             if (looper->state != SYSTEM_STATE_OVERDUBBING)
@@ -314,15 +314,15 @@ printf("PRCal t0idx %d, t1idx %d\n", trackIdx + offset, trackIdx);
         {
            if ((looper->state == SYSTEM_STATE_PLAYBACK) && (prevSystemState != looper->state))
            {
-               printf("Play masterIDX %d, callCounter %d\n", looper->masterCurrIdx, looper->callCounter);
+               printf("Play masterIDX %d, callCounter %d, bytes %d\n", looper->masterCurrIdx, looper->callCounter, byteSize);
            }
            stopTimer(TIMER_RECORD_STOP_DELAY);
             // if we just finished recording, we need to capture the last little bit
             // of data, if playing only we'd miss it - it will likely be part of this
             // buffer (nframes) but not all of it
-#if 0
+#if 1
             if (looper->play_frame_delay > 0)
-            {
+            {   
                 trackIdx = looper->groupedTracks[sg][st]->currIdx;
                 offset = 0; // want only first few frames
                 memcpy (

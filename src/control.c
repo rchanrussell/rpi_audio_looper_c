@@ -123,7 +123,7 @@ static void startRecording(void)
 
     looper->tracks[cc.track].state = TRACK_STATE_RECORDING;
     looper->state = SYSTEM_STATE_RECORDING;
-    printf("Recording track %d on group %d, CC %d\n", cc.track, cc.group, looper->callCounter);
+    printf("Recording track %d on group %d, frame delay %d\n", cc.track, cc.group, looper->rec_frame_delay);
 }
 
 /*
@@ -169,17 +169,17 @@ static void stopRecording(void)
         looper->tracks[cc.track].repeat = cc.repeat;
     }
 
-    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx;// + looper->play_frame_delay;
+    looper->tracks[cc.track].endIdx = looper->tracks[cc.track].currIdx + looper->play_frame_delay;
 
     if (looper->masterLength[cc.group] < looper->masterCurrIdx)
     {
-        looper->masterLength[cc.group] = looper->masterCurrIdx;// + looper->play_frame_delay;
+        looper->masterLength[cc.group] = looper->masterCurrIdx + looper->play_frame_delay;
         looper->masterCurrIdx = 0;
     }
 
     looper->state = SYSTEM_STATE_PLAYBACK;
     looper->tracks[cc.track].state = TRACK_STATE_PLAYBACK;
-    printf("Playing track %d, CC %d\n", cc.track, looper->callCounter);
+    printf("Playing track %d, frame delay %d\n", cc.track, looper->play_frame_delay);
 }
 
 /*
@@ -607,6 +607,7 @@ static void processUART(char buf[])
             if ((buf[SERIAL_SUB_CMD_OFFSET] == SERIAL_CMD_GROUP_SELECT_LC) ||
                 (buf[SERIAL_SUB_CMD_OFFSET] == SERIAL_CMD_GROUP_SELECT_UC))
             {
+                printf("Recording CC %d\n",looper->callCounter);
                 cc.event = SYSTEM_EVENT_RECORD_TRACK;
                 cc.track = (buf[SERIAL_TRACK_UPPER_DIGIT] - 48) * 10;
                 cc.track += (buf[SERIAL_TRACK_LOWER_DIGIT] - 48);
@@ -655,6 +656,7 @@ static void processUART(char buf[])
         case SERIAL_CMD_PLAY_LC: // set system to play
         case SERIAL_CMD_PLAY_UC:
             cc.event = SYSTEM_EVENT_PLAY_TRACK;
+            printf("Playing CC %d\n", looper->callCounter);
             if (buf[SERIAL_LAST_CHAR] == SERIAL_CMD_OPTION_REPEAT_ON)
             {
                 cc.track = (buf[SERIAL_TRACK_UPPER_DIGIT] - 48) * 10;
