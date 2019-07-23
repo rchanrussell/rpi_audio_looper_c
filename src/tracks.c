@@ -62,15 +62,60 @@ void init_track(uint32_t track_length) {
     
 }
 
+// Track indices update handlers based on state
+
+void update_index_play(int track, jack_nframes_t nframes) {
+}
+
+void update_index_record(int track, jack_nframes_t nframes) {
+}
+
+void update_index_repeat(int track, jack_nframes_t nframes) {
+}
+
+void update_index_overdub(int track, jack_nframes_t nframes) {
+}
+
+// determine number of bytes to copy
+// pass in nframes from sample, factor frame_offsets for rec and play
+uint32_t num_bytes_to_copy(jack_nframes_t nframes) {
+
+}
+
+
+
+// Handle data copying based on state
+
+// each handler should access inL/outL/inR/outR pointers
+//                     call appropriate offset/bytesize calculators
+// do not update indices here because these are applied to a track
+// indices are updated byased on looper processing
+
+
+void handle_data_passthrough(int track, bool is_mono, jack_nframes_t nframes) {
+  // do inL = and outL = stuff here
+}
+
+void handle_data_overdubbing(int track, bool is_mono, jack_nframes_t nframes) {
+}
+
+void handle_data_recording(int track, bool is_mono, jack_nframes_t nframes) {
+}
+
+void handle_data_playback(int track, bool is_mono, jack_naframes_t nframes) {
+}
+
+
 /**************************************************************
  * Public functions
  *************************************************************/
 
 /*
  * Tracks Init
+ * Return true if successful
  */
 // 
-void tracks_init(int num_tracks, int max_num_frames) {
+bool tracks_init(int num_tracks, uint32_t max_num_frames) {
   // create array of Tracks and set length to max_num_frames
 }
 
@@ -80,7 +125,7 @@ void tracks_init(int num_tracks, int max_num_frames) {
 
 // Current index functions
 // Negative offset handling required for alignment
-void track_offset_index(int track, int offset) {
+void track_set_relative_offset(int track, uint32_t offset) {
 }
 
 // Adjust track state
@@ -91,13 +136,27 @@ void track_set_repeat(int track, bool set_repeat) {
 }
 
 // Absolute index
-void track_set_index(int track) {
+void track_set_index(int track, uint32_t index) {
 }
 
 // Copies data, starting at current index
 // update current index
-void track_add_data(int track, bool left, jack_default_audio_sample_t *src, jack_nframes_t nframes) {
+void track_add_data(int track, bool is_left, jack_default_audio_sample_t *src, jack_nframes_t nframes) {
 }
+
+// Sets offset into frame for start_recording
+void track_recording_start_frame_offset(int track, uint32_t offset) {
+}
+
+// Sets offset into frame for end_recording
+void track_recording_end_frame_offset(int track, uint32_t offset) {
+}
+
+
+
+
+
+
 
 
 
@@ -131,6 +190,7 @@ void updateIndices(struct MasterLooper *looper, jack_nframes_t nframes)
     }
     // loop through all potential tracks for a group
     // some tracks may belong to more than one group - but that we only update the active group!
+    // TODO with each track, get state use switch case, call update_index_* handler
     while (idx < NUM_TRACKS)
     {
         track = looper->groupedTracks[sg][idx];
@@ -230,6 +290,9 @@ int playRecord (
     static enum SystemStates prevSystemState = SYSTEM_STATE_PASSTHROUGH;
 
     // check for updated state(s)
+    // TODO in other file handlering user input, do not modify track info
+    //      set offsets into frame instead, which should be copied locally to prevent
+    //      any sequence update issues (ie: UI thread sets offset before updateIndex called)
     controlStateCheck();
 
     // block control state changes while in here!
@@ -249,6 +312,7 @@ int playRecord (
     uint8_t st = looper->selectedTrack;
     uint32_t trackIdx = 0;
 
+    // TODO move this into seprate handlers
 	jack_default_audio_sample_t *inL, *outL, *inR, *outR;
 	inL = jack_port_get_buffer (looper->input_portL, nframes);
 	outL = jack_port_get_buffer (looper->output_portL, nframes);
@@ -266,7 +330,7 @@ int playRecord (
 	    outR = jack_port_get_buffer (looper->output_portR, nframes);
     }
 
-
+    // TODO move this into separate handlers
     // Record/Overdub/Playback
     switch(looper->state)
     {
