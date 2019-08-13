@@ -124,19 +124,30 @@ bool tracks_init(int num_tracks, uint32_t max_num_frames) {
  */
 
 // Current index functions
+// Absolute index
+void track_set_current_index(int track, uint32_t index) {
+}
+void track_set_start_index(int track, uint32_t index) {
+}
+void track_set_end_index(int track, uint32_t index) {
+}
+
 // Negative offset handling required for alignment
-void track_set_relative_offset(int track, uint32_t offset) {
+void track_set_current_index_relative_offset(int track, uint32_t offset) {
+}
+void track_set_start_index_ralative_offset(int track, uint32_t offset) {
+}
+void track_set_end_index_relative_offset(int track, uint32_t offset) {
 }
 
 // Adjust track state
 void track_set_state(int track, enum TrackState new_state) {
 }
 
-void track_set_repeat(int track, bool set_repeat) {
+enum TrackState GetTrackState(int track) {
 }
 
-// Absolute index
-void track_set_index(int track, uint32_t index) {
+void track_set_repeat(int track, bool set_repeat) {
 }
 
 // Copies data, starting at current index
