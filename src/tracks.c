@@ -23,6 +23,7 @@
 #include <float.h>
 
 #include "local.h"
+#include "tracks.h"
 
 #include <jack/jack.h>
 

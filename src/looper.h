@@ -22,6 +22,8 @@
 #include <float.h>
 #include <pthread.h>
 
+#include "local.h"
+
 #include <jack/jack.h>
 
 /**************************************************************
@@ -87,28 +89,6 @@
 /**************************************************************
  * Data types                                                 *
  *************************************************************/
-enum TIMER_ENUM {
-    FOREACH_TIMER(GENERATE_ENUM)
-};
-/*
-{
-    TIMER_RECORD_START_DELAY,
-    TIMER_PLAY_RECORD_DELAY,
-    TIMER_PROCESS_TO_PROCESS_TIME,
-    TIMER_RECORD_STOP_DELAY,
-    TIMER_UART_PROCESS,
-    TIMER_COUNT
-};
-*/
-
-enum TrackState
-{
-    TRACK_STATE_OFF,                // Empty track or available for recording
-    TRACK_STATE_PLAYBACK,           // In playback mode
-    TRACK_STATE_RECORDING,          // In recording mode
-    TRACK_STATE_MUTE                // In mute state, don't mixdown
-};
-
 enum SystemEvents
 {
     SYSTEM_EVENT_PASSTHROUGH,               // System->passthrough, all tracks->off, all indexes set to 0
@@ -129,22 +109,6 @@ enum SystemStates
     SYSTEM_STATE_RECORDING,         // Copying data to selected track
     SYSTEM_STATE_OVERDUBBING,       // Overdubbing selected track
     SYSTEM_STATE_CALIBRATION        // For sychronization configuration
-};
-
-struct Track
-{
-    // data buffer - should be an array of samples to allow easier access
-    jack_default_audio_sample_t channelLeft[FRAME_COUNT];
-    jack_default_audio_sample_t channelRight[FRAME_COUNT];
-    uint32_t currIdx;               // Current index into samples, range is 0 to sampleIndexEnd
-    uint32_t startIdx;              // Start location - assigned to master's current location
-    uint32_t endIdx;                // Number of samples for this track - ie track length
-    uint32_t pulseIdxArr[TRACK_TEST_PULSE_COUNT];
-    uint8_t  pulseIdx;
-    enum TrackState state;
-    bool repeat;                    // If track isn't the longest track, we can repeat it:
-                                    //      if we get to the end of this track but not master track
-                                    //      we can repeat this track (or part of it) until master track resets
 };
 
 struct MasterLooper
@@ -181,6 +145,13 @@ struct MasterLooper
  * Public function prototypes
  *************************************************************/
 
+// Malloc 1 time with private init and don't repeat that malloc
+// Be sure to free at close of application
+// This function will subdivide the mass malloc into number of tracks provide
+// Number of groups is irrelevant to the malloc portion, as groups are just collections
+// of tracks and tracks can be owned by multiple groupsd
+bool LooperInitialize(int num_groups, int num_tracks, bool is_stereo);
+
 int GetActiveGroup(void);
 void SetActiveGroup(int group);
 
@@ -200,6 +171,20 @@ void SetPlayFrameDelay(uint32_t delay);
 
 uint32_t GetRecordFrameDelay(void);
 void SetRecordFrameDelay(uint32_t delay);
+
+// Update active tracks for active group
+// For active group, loop through active tracks
+// call tracks.c's update indices passing nframes
+void UpdateIndices(jack_nframes_t nframes);
+
+// Maintain own mixdown buffer, has own mixdown function
+// Handle buffer management, L and R, and call tracks accordingly
+// for copying data to/from
+int ProcessFrames (
+    jack_default_audio_sample_t *mixdownLeft,
+    jack_default_audio_sample_t *mixdownRight,
+    jack_nframes_t nframes);
+
 
 
 #endif // groups.h
