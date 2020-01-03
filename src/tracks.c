@@ -36,17 +36,18 @@
  *************************************************************/
 struct Track
 {
-    // data buffer - should be an array of samples to allow easier access
-    jack_default_audio_sample_t *channelLeft;
-    jack_default_audio_sample_t *channelRight;
-    uint32_t currIdx;               // Current index into samples, range is 0 to sampleIndexEnd
-    uint32_t startIdx;              // Start location - assigned to master's current location
-    uint32_t endIdx;                // Number of samples for this track - ie track length
-    uint32_t maxIdx;                // Max number of samples -- used by malloc
-    enum TrackState state;
-    bool repeat;                    // If track isn't the longest track, we can repeat it:
-                                    //      if we get to the end of this track but not master track
-                                    //      we can repeat this track (or part of it) until master track resets
+  // data buffer - should be an array of samples to allow easier access
+  jack_default_audio_sample_t *channel_left;
+  jack_default_audio_sample_t *channel_right;
+  uint32_t currIdx;     // Current index into samples, range is 0 to sampleIndexEnd
+  uint32_t startIdx;    // Start location - assigned to master's current location
+  uint32_t endIdx;      // Number of samples for this track - ie track length
+  uint32_t maxIdx;      // Max number of samples -- used by malloc
+  enum TrackState state;
+  bool repeat;          // If track isn't the longest track, we can repeat it:
+                        //      if we get to the end of this track but not master track
+                        //      we can repeat this track (or part of it) until master track resets
+  bool overdub;         // overdubbing is subtle variation of record - may update start or end indices
 };
 
 static struct Track *tracks_[NUM_TRACKS];
@@ -54,28 +55,96 @@ struct TrackManager {
     
 };
 
+static uint32_t max_track_length_ = 0;
+static jack_default_audio_sample_t *mute_track_buffer;
 
 /**************************************************************
  * Static functions
  *************************************************************/
 
+// Destroy Track
+static void DestroyTrack(struct Track * track) {
+  track->currIdx = 0;
+  track->startIdx = 0;
+  track->endIdx = 0;
+  track->maxIdx = 0;
+  track->state = TRACK_STATE_OFF;
+  track->repeat = false;
+  if (track->channel_left != NULL) {
+    free(track->channel_left);
+  }
+  if (track->channel_right != NULL) {
+    free(track->channel_right);
+  }
+}
+
 // Init Track
-void init_track(uint32_t track_length, bool is_stereo) {
-    
+static void InitTrack(struct Track * track, bool is_stereo) {
+  track->currIdx = 0;
+  track->startIdx = 0;
+  track->endIdx = 0;
+  track->maxIdx = max_track_length_;
+  track->state = TRACK_STATE_OFF;
+  track->repeat = false;
+  track->channel_left = (jack_default_audio_sample_t *)calloc(max_num_frames, sizeof(jack_default_audio_sample_t));
+  if (is_stereo) {
+    track->channel_right = (jack_default_audio_sample_t *)calloc(max_num_frames, sizeof(jack_default_audio_sample_t));
+  }
+}
+
+static void SetMaxTrackLength(int num_tracks, unsigned long avail_mem, bool is_stereo) {
+  max_track_length_ = avail_mem / num_tracks;
+  if (is_stereo) {
+    max_track_length_ /= 2;
+  }
 }
 
 // Track indices update handlers based on state
+// Change states of track if necessary
+/// TODO: all tracks treated same -- update indexes based on state -- treat OFF as PLAY
+/// should give consistent timing - data should be zero in those areas
+/// should be simpler to manage instead of checking starts and stops
+/// Empty tracks will have values of 0
 
-void update_index_play(int track, jack_nframes_t nframes) {
+void UpdateIndexPlay(int track, jack_nframes_t nframes) {
+  if (tracks_[track]->currIdx + nframes < max_track_length_) {
+    tracks_[track]->currIdx += nframes;
+  } else {
+    tracks_[track]->currIdx = 0;
+  }
 }
 
-void update_index_record(int track, jack_nframes_t nframes) {
+// TODO: Entering record state, caller, set startIdx and endIdx to currIdx
+void UpdateIndexRecord(int track, jack_nframes_t nframes) {
+  if (tracks_[track]->currIdx + nframes < max_track_length_) {
+    tracks_[track]->currIdx += nframes;
+    tracks_[track]->endIx += nframes;
+  } else {  // Change state and offsets
+    // Change track state to PLAY
+    tracks_[track]->currIdx = 0;
+  }
 }
 
-void update_index_repeat(int track, jack_nframes_t nframes) {
+// TODO: Entering repeat state (always from recording), caller, set endIdx to currIdx
+void UpdateIndexRepeat(int track, jack_nframes_t nframes) {
+  if (tracks_[track]->currIdx + nframes < tracks_[track]->endIdx) {
+    tracks_[track]->currIdx += nframes;
+  } else {
+    tracks_[track]->currIdx = tracks_[track]->startIdx;
+  }
 }
 
-void update_index_overdub(int track, jack_nframes_t nframes) {
+void UpdateIndexOverdub(int track, jack_nframes_t nframes) {
+  if (tracks_[track]->currIdx + nframes < max_track_length_) {
+    // is overdubbing extending current track recorded length?
+    if (tracks_[track]->currIdx + nframes > tracks_[track]->endIdx) {
+      tracks_[track]->endIx += nframes;
+    }
+    tracks_[track]->currIdx += nframes;
+  } else {  // Change state and offsets
+    // Change track state to PLAY
+    tracks_[track]->currIdx = 0;
+  }
 }
 
 // determine number of bytes to copy
@@ -84,29 +153,91 @@ uint32_t num_bytes_to_copy(jack_nframes_t nframes) {
 
 }
 
+/// TODO: State machine handler for each track - move from control.c
+// handler will - copy data: from supplied buffer to track buffer or vice versa
+//                -- if state is MUTE - data is 0
+//              - update indexes
 
 
-// Handle data copying based on state
+/// Track State Handlers - steady state not transition!
 
-// each handler should access inL/outL/inR/outR pointers
-//                     call appropriate offset/bytesize calculators
-// do not update indices here because these are applied to a track
-// indices are updated byased on looper processing
+/// Copy Data from track buffer to supplied buffer
+void GetTrackData(
+  int track,
+  uint32_t track_index,
+  jack_default_audio_sample_t *channel_left,
+  jack_default_audio_sample_t *channel_right,
+  uint32_t nframes) {
 
-
-void handle_data_passthrough(int track, bool is_mono, jack_nframes_t nframes) {
-  // do inL = and outL = stuff here
+  if (channel_left != NULL && tracks_[track].channel_left != NULL) {
+    memcpy(channel_left,
+           &tracks_[track].channel_left[track_index],
+           nframes);
+  }
+  if (channel_right != NULL && tracks_[track].channel_right != NULL) {
+    memcpy(channel_right,
+           &tracks_[track].channel_right[track_index],
+           nframes);
+  }
 }
 
-void handle_data_overdubbing(int track, bool is_mono, jack_nframes_t nframes) {
+/// Copy Data to track buffer from supplied buffer
+void SetTrackData(
+  int track,
+  uint32_t track_index,
+  jack_default_audio_sample_t *channel_left,
+  jack_default_audio_sample_t *channel_right,
+  uint32_t nframes) {
+
+  if (channel_left != NULL && tracks_[track].channel_left != NULL) {
+    memcpy(&tracks_[track].channel_left[track_index], channel_left, nframes);
+  }
+  if (channel_right != NULL && tracks_[track].channel_right != NULL) {
+    memcpy(&tracks_[track].channel_right[track_index], channel_right, nframes);
+  }
 }
 
-void handle_data_recording(int track, bool is_mono, jack_nframes_t nframes) {
+
+/// Track Event Handlers - once Process is called, it will actually do something
+
+void HandleTransitionToPlay(int track) {
+  // Copy Data
+  // Update Indices 
+  // Transition state
+  tracks_[track].state = TRACK_STATE_PLAYBACK;
+  tracks_[track].overdub = false;
+  tracks_[track].repeat = false;
 }
 
-void handle_data_playback(int track, bool is_mono, jack_naframes_t nframes) {
+void HandleTransitionToRepeat(int track) {
+  // Copy Data
+  // Update Indices
+  // Transition state
+  tracks_[track].state = TRACK_STATE_PLAYBACK;
+  tracks_[track].repeat = true;
 }
 
+void HandleTransitionToRecording(int track) {
+  // Copy Data
+  // Update Indices
+  // Transition state
+  tracks_[track].state = TRACK_STATE_RECORDING;
+}
+
+void HandleTransitionToOverdubbing(int track) {
+  // Copy Data
+  // Update Indices
+  // Transition state
+  tracks_[track].state = TRACK_STATE_RECORDING;
+  tracks_[track].overdub = true;
+}
+
+void HandleTransitionToMute(int track) {
+  // Copy Data
+  // Update Indices
+  // Transition state
+  tracks_[track].state = TRACK_STATE_MUTE;
+}
 
 /**************************************************************
  * Public functions
@@ -117,19 +248,22 @@ void handle_data_playback(int track, bool is_mono, jack_naframes_t nframes) {
  * Return true if successful
  */
 // 
-bool tracks_init(int num_tracks, uint32_t max_num_frames, bool is_stereo) {
+bool InitTracks(int num_tracks, uint32_t avail_mem, bool is_stereo) {
+  if (num_tracks > NUM_TRACKS) {
+    return false;
+  }
+  // Determine max track length
+  struct sysinfo info;
+  int sysinfo(&info);
   
+  SetMaxTrackLength(num_tracks, info.freeram, is_stereo);
+  /// TODO: What to do if malloc fails? Stop free all? Return limited configuration?
   for (int track = 0; track < num_tracks; track++) {
-    tracks_[track]->currIdx = 0;
-    tracks_[track]->startIdx = 0;
-    tracks_[track]->endIdx = 0;
-    tracks_[track]->maxIdx = max_num_frames;
-    tracks_[track]->state = TRACK_STATE_OFF;
-    tracks_[track]->repeat = false;
-    tracks_[track]->channelLeft = malloc(max_num_frames * sizeof(jack_default_audio_sample_t));
-    if (is_stereo) {
-      tracks_[track]->channelRight = malloc(max_num_frames * sizeof(jack_default_audio_sample_t));
-    }
+    InitTrack(tracks_[track], is_stereo);
+  }
+  mute_track_buffer = (jack_default_audio_sample_t *)calloc(128, sizeof(jack_default_audio_sample_t));
+  if (mute_track_buffer == NULL) {
+    return false;
   }
   return true;
 }
@@ -137,6 +271,25 @@ bool tracks_init(int num_tracks, uint32_t max_num_frames, bool is_stereo) {
 /*
  * Track Control
  */
+
+/// Set next state - do not update anything as Process might be running!
+void SetTrackToPlay(int track) {
+}
+
+void SetTrackToRepeat(int track) {
+}
+
+void SetTrackToRecord(int track) {
+}
+
+void SetTrackToOverdub(int track) {
+}
+
+// In this state mixdown will substitute zero
+void SetTrackToMute(int track) {
+}
+
+
 
 // Current index functions
 // Absolute index

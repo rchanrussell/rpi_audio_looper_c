@@ -266,7 +266,7 @@ int main (int argc, char *argv[])
   // TODO: Init Serial Port - wait for config with timeout
 
   // TODO: Init Looper - pass # tracks, pass # groups?, and stereo/mono
-
+    // Process # tracks & stereo/mono with avail_ram - set max_track_length
     // Config Track Manager:
       // Malloc block/tracks
       // tracks configs to default
