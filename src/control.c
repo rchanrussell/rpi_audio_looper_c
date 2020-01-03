@@ -792,21 +792,6 @@ bool controlInit(struct MasterLooper *mLooper)
 {
     looper = mLooper;
 
-    if (wiringPiSetup() == -1)
-    {
-        printf("WiringPiSetup failed\n");
-        return false;
-    }
-
-    looper->sfd = serialOpen("/dev/ttyAMA0",  115200);
-    if (looper->sfd < 0)
-    {
-        printf("Error setting up serial port\n");
-        return false;
-    }
-    serialFlush(looper->sfd);
-    looper->min_serial_data_length = MIN_SERIAL_DATA_LENGTH;
-
     // Setup interface monitoring thread
     int rc;
     if ((rc = pthread_create(&looper->controlTh, NULL, controlThread, NULL)))
@@ -814,24 +799,6 @@ bool controlInit(struct MasterLooper *mLooper)
         printf("Error: pthread_create, rc: %d\n", rc);
         return false;
     }
-/*
-    // Testing for offset managment -- sync track 1 to track 0
-    int j = 0;
-    for (j=0; j<TRACK_DEBUG_FRAME_COUNT; j++)
-      looper->tracks[0].channelLeft[j] = FLT_MAX;
-
-    looper->tracks[0].endIdx = TRACK_DEBUG_FRAME_COUNT;
-    looper->selectedGroup = 1;
-    looper->selectedTrack = 1;
-    looper->groupedTracks[1][0] = &looper->tracks[0];
-    looper->tracks[0].state = TRACK_STATE_PLAYBACK;
-    looper->masterLength[1] = TRACK_DEBUG_FRAME_COUNT;
-    looper->state = SYSTEM_STATE_PLAYBACK;
-*/
-//    looper->groupedTracks[0][1] = &looper->tracks[1];
-//    looper->tracks[1].state = TRACK_STATE_RECORDING;
-//    looper->state = SYSTEM_STATE_CALIBRATION;
-
     return true;
 }
 

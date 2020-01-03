@@ -49,6 +49,7 @@ struct Track
                                     //      we can repeat this track (or part of it) until master track resets
 };
 
+static struct Track *tracks_[NUM_TRACKS];
 struct TrackManager {
     
 };
@@ -59,7 +60,7 @@ struct TrackManager {
  *************************************************************/
 
 // Init Track
-void init_track(uint32_t track_length) {
+void init_track(uint32_t track_length, bool is_stereo) {
     
 }
 
@@ -116,8 +117,21 @@ void handle_data_playback(int track, bool is_mono, jack_naframes_t nframes) {
  * Return true if successful
  */
 // 
-bool tracks_init(int num_tracks, uint32_t max_num_frames) {
-  // create array of Tracks and set length to max_num_frames
+bool tracks_init(int num_tracks, uint32_t max_num_frames, bool is_stereo) {
+  
+  for (int track = 0; track < num_tracks; track++) {
+    tracks_[track]->currIdx = 0;
+    tracks_[track]->startIdx = 0;
+    tracks_[track]->endIdx = 0;
+    tracks_[track]->maxIdx = max_num_frames;
+    tracks_[track]->state = TRACK_STATE_OFF;
+    tracks_[track]->repeat = false;
+    tracks_[track]->channelLeft = malloc(max_num_frames * sizeof(jack_default_audio_sample_t));
+    if (is_stereo) {
+      tracks_[track]->channelRight = malloc(max_num_frames * sizeof(jack_default_audio_sample_t));
+    }
+  }
+  return true;
 }
 
 /*

@@ -152,6 +152,11 @@ struct MasterLooper
 // of tracks and tracks can be owned by multiple groupsd
 bool LooperInitialize(int num_groups, int num_tracks, bool is_stereo);
 
+// API for port - set/get port via enum for port type (inL, outL, inR, outR)
+// API for client - store's client
+// API for exitNow
+
+
 int GetActiveGroup(void);
 void SetActiveGroup(int group);
 

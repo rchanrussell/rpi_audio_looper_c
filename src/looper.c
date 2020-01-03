@@ -123,10 +123,36 @@ struct MasterLooper
     bool        exitNow;                    // Enables program to exit via UART cmd
 };
 
+static struct MasterLooper looper;
+
+/**************************************************************
+ * Static function definitions
+ *************************************************************/
+// Init Serial Port
+bool InitSerialPort() {
+  if (wiringPiSetup() == -1)
+  {
+    printf("WiringPiSetup failed\n");
+    return false;
+  }
+
+  looper.sfd = serialOpen("/dev/ttyAMA0",  115200);
+  if (looper.sfd < 0)
+  {
+    printf("Error setting up serial port\n");
+    return false;
+  }
+  serialFlush(looper.sfd);
+  looper.min_serial_data_length = MIN_SERIAL_DATA_LENGTH;
+}
+
+
 
 /**************************************************************
  * Public function definitions
  *************************************************************/
+bool InitLooper(int num_tracks, bool is_stereo) {
+}
 
 int GetActiveGroup(void) {
 }
