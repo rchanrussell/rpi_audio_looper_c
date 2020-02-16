@@ -120,7 +120,7 @@ void UpdateIndexRecord(int track, jack_nframes_t nframes) {
     tracks_[track]->currIdx += nframes;
     tracks_[track]->endIx += nframes;
   } else {  // Change state and offsets
-    // Change track state to PLAY
+    // Force track state to PLAY
     tracks_[track]->currIdx = 0;
   }
 }
@@ -197,44 +197,107 @@ void SetTrackData(
   }
 }
 
+/// Set Pointers to Buffers of Jack Ports
+void SetPointersToJackPortBuffers(
+  jack_default_audio_sample_t *inL,
+  jack_default_audio_sample_t *outL,
+  jack_default_audio_sample_t *inR,
+  jack_default_audio_sample_t *outR) {
+
+  inL = jack_port_get_buffer (looper->input_portL, nframes);
+  outL = jack_port_get_buffer (looper->output_portL, nframes);
+
+  // mono devices will use only the left ports
+  // if right ports are NULL, do not copy data
+  inR = NULL;
+  outR = NULL;
+  if (looper->input_portR)
+  {
+    inR = jack_port_get_buffer (looper->input_portR, nframes);
+  } 
+  if (looper->output_portR)
+  {
+    outR = jack_port_get_buffer (looper->output_portR, nframes);
+  }
+}
 
 /// Track Event Handlers - once Process is called, it will actually do something
 
-void HandleTransitionToPlay(int track) {
+void HandleStatePlay(int track, uint32_t nframes) {
   // Copy Data
+  jack_default_audio_sample_t *inL, *outL, *inR, *outR;
+  SetPointersToJackPortBuffers(intL, outL, inR, outR);
+  GetTrackData(
+    track,
+    tracks_[track].currIdx,
+    outL, outR,
+    nframes);
+
   // Update Indices 
+  UpdateIndexPlay(track, nframes);
+
   // Transition state
   tracks_[track].state = TRACK_STATE_PLAYBACK;
   tracks_[track].overdub = false;
   tracks_[track].repeat = false;
 }
 
-void HandleTransitionToRepeat(int track) {
+void HandleStateRepeat(int track, uint32_t nframes) {
   // Copy Data
+  GetTrackData(
+    track,
+    tracks_[track].currIdx,
+    outL, outR,
+    nframes);
+
   // Update Indices
+  UpdateIndexRepeat(track, nframes);
+
   // Transition state
   tracks_[track].state = TRACK_STATE_PLAYBACK;
   tracks_[track].repeat = true;
 }
 
-void HandleTransitionToRecording(int track) {
+void HandleStateRecording(int track, uint32_t nframes) {
   // Copy Data
+  jack_default_audio_sample_t *inL, *outL, *inR, *outR;
+  SetPointersToJackPortBuffers(intL, outL, inR, outR);
+  SetTrackData(
+    track,
+    tracks_[track].currIdx,
+    inL, intR,
+    nframes);
+
   // Update Indices
+  UpdateIndexRecord(track, nframes);
+
   // Transition state
   tracks_[track].state = TRACK_STATE_RECORDING;
 }
 
-void HandleTransitionToOverdubbing(int track) {
+void HandleStateOverdubbing(int track, uint32_t nframes) {
   // Copy Data
+  jack_default_audio_sample_t *inL, *outL, *inR, *outR;
+  SetPointersToJackPortBuffers(intL, outL, inR, outR);
+  SetTrackData(
+    track,
+    tracks_[track].currIdx,
+    inL, intR,
+    nframes);
+
   // Update Indices
+  UpdateIndexOverdub(track, nframes);
+
   // Transition state
   tracks_[track].state = TRACK_STATE_RECORDING;
   tracks_[track].overdub = true;
 }
 
-void HandleTransitionToMute(int track) {
+void HandleStateMute(int track) {
   // Copy Data
   // Update Indices
+  UpdateIndexPlay(track, nframes);
+
   // Transition state
   tracks_[track].state = TRACK_STATE_MUTE;
 }
