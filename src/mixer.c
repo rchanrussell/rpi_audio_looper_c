@@ -34,7 +34,28 @@
 /**************************************************************
  * Static functions
  *************************************************************/
+/*
+ * Function: sumTwoSamples
+ * Input: sample channel 1
+ *        sample channel 2
+ * Output: summation
+ * Description:
+ *
+ */
+jack_default_audio_sample_t sumTwoSamples(
+    jack_default_audio_sample_t sample1, 
+    jack_default_audio_sample_t sample2)
+{
+    jack_default_audio_sample_t sum = 0;
+    sum = sample1 + sample2;
+    // use tanh(*p + track[sample]) if > MAX_SAMPLE_VALUE
+    if (sum >= MAX_SAMPLE_VALUE)
+    {
+        sum = tanh(sample1 + sample2);
+    }
 
+    return sum;
+}
 /**************************************************************
  * Public functions
  *************************************************************/
@@ -61,11 +82,7 @@ void overdub(
 
     for (sample = 0; sample < nframes; sample++)
     {
-        sum = *p + track[sample];
-        if (sum > 0.9 * MAX_SAMPLE_VALUE)
-        {
-            sum *= 0.9;
-        }
+        sum = sum(TwoChannels(*p, track[sample]);
         track[sample] = sum;
         p++;
     }
@@ -73,106 +90,85 @@ void overdub(
 
 /*
  * Function: doMixDown
- * Input: pointer to the Jack supplied input data buffer for left channel
+ * Input:
+ *        number of tracks to mixdown
+ *        pointer to array of track indexes (index into appropriate tracks to mixdown)
+ *        pointer to memory block of tracks (treated as double array)
+ *        pointer to the Jack supplied input data buffer for left channel
  *        pointer to the Jack supplied input data buffer for the right channel
  *        pointer to the mixdown output data buffer for the left channel
  *        pointer to the mixdown output data buffer for the right channel
- *        number of frames to overdub
+ *        number of frames to mixdown
  * Output: none
  * Description:
  *   Mixdown the tracks associated with the active group, limiting if necessary
- *   Do not blindly mixdown based upon activeTracks because this destroys grouping ability
- *   Focus on track state of Play or Mute
- *   - GroupNumber updates via control handling will update the individual track's P or M status
- *
  */
 void doMixDown(
-    struct MasterLooper *looper,
+    uint32_t number_of_tracks,
+    jack_default_audio_sample_t *array_of_track_indexes,
+    jack_default_audio_sample_t *trackBuffers,
     jack_default_audio_sample_t *inBufferLeft,
     jack_default_audio_sample_t *inBufferRight,
-    jack_default_audio_sample_t *mixdownBufferLeft,
-    jack_default_audio_sample_t *mixdownBufferRight,
+    jack_default_audio_sample_t *outBufferLeft,
+    jack_default_audio_sample_t *outBufferRight,
     jack_nframes_t nframes)
 {
-    uint32_t trackIdx;
+    jack_default_audio_sample_t track_index;
     jack_default_audio_sample_t sumLeft = 0;
     jack_default_audio_sample_t sumRight = 0;
-    uint8_t sg = looper->selectedGroup;
     uint8_t idx = 0;
     uint8_t sample;
-    struct Track * track;
-    static bool bNoData = true;
-   for (sample = 0; sample < nframes; sample++)
+
+    if !(array_of_track_indexes && trackBuffers && inBufferLeft && inBufferRight &&
+         outBufferLeft && outBufferRight)
+    {
+        return;
+    }
+
+    for (sample = 0; sample < nframes; sample++)
     {
         sumLeft = 0;
         sumRight = 0;
         idx = 0;
 
-        // loop through all potential tracks in selected group for given sample
-        // some groups may contain same tracks (ie same drum track for group 1 and 2
-        // check track states as some tracks may be muted or off/empty/erased
-        // tracks can move groups - NULL will be assigned for the former group if track moves
-        while (idx < NUM_TRACKS)
+        // Mixdown playing tracks for the sample offset
+        while (idx < number_of_tracks)
         {
-            track = looper->groupedTracks[sg][idx];
-            if ( (track != NULL) &&
-                 (track->currIdx >= track->startIdx) &&
-                 //(track->currIdx < track->endIdx) &&
-                 (track->state != TRACK_STATE_OFF) &&
-                 (track->state != TRACK_STATE_MUTE))
-            {
-
-                trackIdx = track->currIdx + sample;
-                if (trackIdx <= track->endIdx)
-                {
-
-if (track->channelLeft[trackIdx] == MAX_SAMPLE_VALUE)
-{
-    if (track->pulseIdx < 7)
-      track->pulseIdxArr[track->pulseIdx++] = trackIdx;
-}
-if ((bNoData) && (track->channelLeft[trackIdx] != 0.0))
-{
-    printf("T%d idx %d, CC %d\n", idx, trackIdx, looper->callCounter);
-    bNoData = false;
-}
-
-                    sumLeft += track->channelLeft[trackIdx];
-                    if (sumLeft > 0.9 * MAX_SAMPLE_VALUE)
-                    {
-                        sumLeft *= 0.9;
-                    }
-
-                    sumRight += track->channelRight[trackIdx];
-                    if (sumRight > 0.9 * MAX_SAMPLE_VALUE)
-                    {
-                        sumRight *= 0.9;
-                    }
-                }
-            }
+            // get starting index from array_of_track_indexes
+            // add sample offset as we move through the number of frames to mixdown
+            // left track index then right track index, then next track left and right etc..
+            track_index = array_of_track_indexes[track_count];
+            sumLeft = sumTwoSamples(sumLeft, trackBuffers[track_index + sample]);
             idx++;
+            if (inBufferRight)
+            {
+                track_index = array_of_track_indexes[track_count];
+                sumRight = sumTwoSamples(sumRight, trackBuffers[track_index + sample]);
+                idx++;
+            }
         }
+
+        // Add input buffer to mixdown
         if (inBufferLeft)
         {
-            sumLeft += inBufferLeft[sample];
-            if (sumLeft > 0.9 * MAX_SAMPLE_VALUE)
-            {
-                sumLeft *= 0.9;
-            }
+            sumLeft = sumTwoSamples(sumLeft, inBufferLeft[sample]);
         }
 
         if (inBufferRight)
         {
-            sumRight += inBufferRight[sample];
-            if (sumRight > 0.9 * MAX_SAMPLE_VALUE)
-            {
-                sumRight *= 0.9;
-            }
+            sumRight = sumTwoSamples(sumRight, inBufferRight[sample]);
         }
 
-        mixdownBufferLeft[sample] = sumLeft;
-        mixdownBufferRight[sample] = sumRight;
-    }
+        // Output mixdown to output buffer, which Jack/Alsa will later output to audio device
+        if (inBufferLeft)
+        {
+            outBufferLeft[sample] = sumLeft;
+        }
+        if (inBufferRight)
+        {
+            outBufferRight[sample] = sumRight;
+        }
+    } // sample for loop
 }
 
 

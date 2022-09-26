@@ -1,5 +1,5 @@
 /**************************************************************
- * Copyright (C) 2019 by Chan Russell, Robert                 *
+ * Copyright (C) 2021 by Chan Russell, Robert                 *
  *                                                            *
  * Project: Audio Looper                                      *
  *                                                            *
@@ -34,6 +34,7 @@
 /**************************************************************
  * Data types                                                 *
  *************************************************************/
+
 struct Track
 {
   // data buffer - should be an array of samples to allow easier access
@@ -306,12 +307,16 @@ void HandleStateMute(int track) {
  * Public functions
  *************************************************************/
 
-/*
- * Tracks Init
- * Return true if successful
+/* Tracks initialization
+ * Malloc largest buffer
+ * Determine number of samples to support number of tracks - all
+ *  must be the same size, watch for non-even division
+ * Create list of track pointers based on number of tracks
+ * Create track pointer max offset value based on track length
+ * Return true if initialization good: malloc successful
  */
-// 
-bool InitTracks(int num_tracks, uint32_t avail_mem, bool is_stereo) {
+
+bool TrackManagerInit(int num_tracks, bool is_stereo) {
   if (num_tracks > NUM_TRACKS) {
     return false;
   }
@@ -709,6 +714,20 @@ printf("PRCal t0idx %d, t1idx %d\n", trackIdx + offset, trackIdx);
 #endif
             // mixdown
             // when mixing - take into account 2 buffer delay otherwise recorded will be behind
+/*
+            track = looper->groupedTracks[sg][idx];
+            if ( (track != NULL) &&
+                 (track->currIdx >= track->startIdx) &&
+                 //(track->currIdx < track->endIdx) &&
+                 (track->state != TRACK_STATE_OFF) &&
+                 (track->state != TRACK_STATE_MUTE))
+            {
+
+                trackIdx = track->currIdx + sample;
+                if (trackIdx <= track->endIdx)
+*/
+
+
             doMixDown(looper, inL, outL, mixdownLeft, mixdownRight, nframes);
             // output mix
             memcpy (outL, mixdownLeft, byteSize);

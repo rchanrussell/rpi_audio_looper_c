@@ -9,8 +9,8 @@
  *                                                            *
  *************************************************************/
 
-#ifndef LOCAL_H
-#define LOCAL_H
+#ifndef GROUP_MANAGER_H
+#define GROUP_MANAGER_H
 
 #include <stdio.h>
 #include <errno.h>
@@ -47,4 +47,4 @@ void MuteGroupTracks(int group);
 void ClearGroupTracks(int group);
 
 
-#endif // groups.h
+#endif // GROUP_MANAGER_H

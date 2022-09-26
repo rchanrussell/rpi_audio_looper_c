@@ -1,5 +1,5 @@
 /**************************************************************
- * Copyright (C) 2017 by Chan Russell, Robert                 *
+ * Copyright (C) 20w1 by Chan Russell, Robert                 *
  *                                                            *
  * Project: Audio Looper                                      *
  *                                                            *
@@ -34,17 +34,48 @@
 enum TrackState
 {
     TRACK_STATE_OFF,                // Empty track or available for recording
+    TRACK_STATE_OVERDUB,            // In overdub mode, may/may not update start/end indicies
     TRACK_STATE_PLAYBACK,           // In playback mode
-    TRACK_STATE_RECORDING,          // In recording mode
+    TRACK_STATE_RECORDING,          // In recording mode - overwrites any previous recording info
     TRACK_STATE_MUTE                // In mute state, don't mixdown
 };
+
+// List of pointers to tracks
+// If not used/muted/on another group - NULL
+// Include L and R? or just is_stereo flag and Mixer assume L then R then L then R?
+
+typedef jack_default_audio_sample_t* TracksCurrentBufferList[MAX_NUMBER_OF_TRACKS];
 
 /**************************************************************
  * Public function prototypes
  *************************************************************/
 
-// Tracks initialization
-bool TracksInit(int number_of_tracks, uint32_t max_track_size);
+/* Tracks initialization
+ * @param[in]: number_of_tracks - number of tracks to be created
+ * @param[in]: is_stereo - determine to create one or two data buffers
+ *             per track
+ * @return: true if initialization good: malloc successful
+ */
+bool TrackManagerInit(int number_of_tracks, bool is_stereo);
+
+// Get track states from main system - update states of all tracks
+//     update active_track for faster processing
+// Get port(s) for input from main system - use _is_stereo if need L and R input
+// If active track is recording:
+//     use jack_port_get_buffer (port_info, n_frames) to get buffer then
+//     use memcpy to direct it in to the local track buffer
+// ** output_port will be for mixer - it should request from main system
+// Return: set passed array of left (mono) - NULL if muted/not used
+//         set passed array of right -- all NULL if mono, NULL if muted/not used
+TrackManagerUpdateTracks();
+
+/* Retreive up to two lists to mixdown, NULL means replace value with zero
+ * @param[in/out] pointer to left_buffer_pointer_list, 16 tracks
+ * @param[in/out] pointer to right_buffer_pointer_list, 16 tracks
+TrackManagerReturnPointerToTracksToMix();
+
+TrackManagerResetAllTracks();
+
 
 /*
  * Track Control
